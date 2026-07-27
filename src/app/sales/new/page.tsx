@@ -21,6 +21,8 @@ interface Item {
   price: number;
   stock: number;
   unit: string;
+  brand?: string;
+  variety?: string;
 }
 
 interface Customer {
@@ -33,6 +35,8 @@ interface Customer {
 interface CartItem {
   itemId: string;
   name: string;
+  brand?: string;
+  variety?: string;
   quantity: number;
   price: number; // Sale price (can be custom)
   unit: string;
@@ -55,6 +59,9 @@ export default function NewSale() {
   // Cart Build State
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedItemId, setSelectedItemId] = useState('');
+  const [selectedProductName, setSelectedProductName] = useState('');
+  const [selectedBrand, setSelectedBrand] = useState('');
+  const [selectedVariety, setSelectedVariety] = useState('');
   const [salePrice, setSalePrice] = useState('');
   const [saleQty, setSaleQty] = useState('');
 
@@ -106,6 +113,22 @@ export default function NewSale() {
     }
   }, [customerPhone, customers]);
 
+  // Automatically resolve selectedItemId based on cascading dropdowns
+  useEffect(() => {
+    if (selectedProductName && selectedBrand && selectedVariety) {
+      const match = items.find(it => 
+        it.name === selectedProductName && 
+        (it.brand || 'No Brand') === selectedBrand && 
+        (it.variety || 'No Variety') === selectedVariety
+      );
+      if (match) {
+        setSelectedItemId(match._id);
+        return;
+      }
+    }
+    setSelectedItemId('');
+  }, [selectedProductName, selectedBrand, selectedVariety, items]);
+
   // Handle selected item price fill
   useEffect(() => {
     if (selectedItemId) {
@@ -150,6 +173,8 @@ export default function NewSale() {
         {
           itemId: selectedItemId,
           name: matchItem.name,
+          brand: matchItem.brand,
+          variety: matchItem.variety,
           quantity: qty,
           price: price,
           unit: matchItem.unit,
@@ -159,6 +184,9 @@ export default function NewSale() {
     }
 
     // Clear item inputs
+    setSelectedProductName('');
+    setSelectedBrand('');
+    setSelectedVariety('');
     setSelectedItemId('');
     setSaleQty('');
     setSalePrice('');
@@ -312,17 +340,59 @@ export default function NewSale() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Select Item *</label>
+              <label className="form-label">Select Product *</label>
               <select
                 className="form-control"
-                value={selectedItemId}
-                onChange={(e) => setSelectedItemId(e.target.value)}
+                value={selectedProductName}
+                onChange={(e) => {
+                  setSelectedProductName(e.target.value);
+                  setSelectedBrand('');
+                  setSelectedVariety('');
+                }}
               >
-                <option value="">-- Choose Item from Stock --</option>
-                {items.map(item => (
-                  <option key={item._id} value={item._id}>
-                    {item.name} ({item.category}) — Stock: {item.stock} {item.unit}
-                  </option>
+                <option value="">-- Choose Product --</option>
+                {Array.from(new Set(items.map(it => it.name))).sort().map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Select Brand *</label>
+              <select
+                className="form-control"
+                value={selectedBrand}
+                onChange={(e) => {
+                  setSelectedBrand(e.target.value);
+                  setSelectedVariety('');
+                }}
+                disabled={!selectedProductName}
+              >
+                <option value="">-- Choose Brand --</option>
+                {selectedProductName && Array.from(new Set(
+                  items.filter(it => it.name === selectedProductName).map(it => it.brand || 'No Brand')
+                )).sort().map(br => (
+                  <option key={br} value={br}>{br}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Select Variety *</label>
+              <select
+                className="form-control"
+                value={selectedVariety}
+                onChange={(e) => setSelectedVariety(e.target.value)}
+                disabled={!selectedBrand}
+              >
+                <option value="">-- Choose Variety --</option>
+                {selectedBrand && Array.from(new Set(
+                  items.filter(it => 
+                    it.name === selectedProductName && 
+                    (it.brand || 'No Brand') === selectedBrand
+                  ).map(it => it.variety || 'No Variety')
+                )).sort().map(v => (
+                  <option key={v} value={v}>{v}</option>
                 ))}
               </select>
             </div>
@@ -408,9 +478,14 @@ export default function NewSale() {
                   {cart.map((cartItem, idx) => (
                     <tr key={idx}>
                       <td style={{ fontWeight: 600 }}>
-                        {cartItem.name}
+                        <div>{cartItem.name}</div>
+                        {(cartItem.brand || cartItem.variety) && (
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 400 }}>
+                            ({cartItem.brand || 'No Brand'} - {cartItem.variety || 'No Variety'})
+                          </div>
+                        )}
                         {cartItem.quantity > cartItem.maxStock && (
-                          <div style={{ fontSize: '0.65rem', color: 'var(--danger)', fontStyle: 'italic' }}>
+                          <div style={{ fontSize: '0.65rem', color: 'var(--danger)', fontStyle: 'italic', marginTop: '0.1rem' }}>
                             (Warning: Low Stock)
                           </div>
                         )}
@@ -539,7 +614,14 @@ export default function NewSale() {
                 <tbody>
                   {createdInvoice.items.map((it: any, index: number) => (
                     <tr key={index}>
-                      <td style={{ padding: '0.5rem 0' }}>{it.name}</td>
+                      <td style={{ padding: '0.5rem 0' }}>
+                        <div>{it.name}</div>
+                        {(it.brand || it.variety) && (
+                          <div style={{ fontSize: '0.75rem', color: '#666666' }}>
+                            ({it.brand || 'No Brand'} - {it.variety || 'No Variety'})
+                          </div>
+                        )}
+                      </td>
                       <td style={{ textAlign: 'center', padding: '0.5rem 0' }}>{it.quantity} {it.unit}</td>
                       <td style={{ textAlign: 'right', padding: '0.5rem 0' }}>₹{it.price.toFixed(2)}</td>
                       <td style={{ textAlign: 'right', padding: '0.5rem 0' }}>₹{(it.quantity * it.price).toFixed(2)}</td>

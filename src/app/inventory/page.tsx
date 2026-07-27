@@ -18,6 +18,8 @@ interface Item {
   price: number;
   stock: number;
   unit: string;
+  brand?: string;
+  variety?: string;
 }
 
 export default function Inventory() {
@@ -37,6 +39,8 @@ export default function Inventory() {
   const [price, setPrice] = useState('');
   const [unit, setUnit] = useState('kg');
   const [initialStock, setInitialStock] = useState('0');
+  const [brand, setBrand] = useState('');
+  const [variety, setVariety] = useState('');
   
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -85,7 +89,9 @@ export default function Inventory() {
           category,
           price: Number(price),
           stock: Number(initialStock),
-          unit
+          unit,
+          brand,
+          variety
         })
       });
       const data = await res.json();
@@ -98,6 +104,8 @@ export default function Inventory() {
         setPrice('');
         setUnit('kg');
         setInitialStock('0');
+        setBrand('');
+        setVariety('');
         fetchItems();
       } else {
         setError(data.error || 'Failed to add item');
@@ -114,6 +122,8 @@ export default function Inventory() {
     setCategory(item.category);
     setPrice(item.price.toString());
     setUnit(item.unit);
+    setBrand(item.brand || '');
+    setVariety(item.variety || '');
     setIsEditOpen(true);
   };
 
@@ -129,7 +139,9 @@ export default function Inventory() {
           name,
           category,
           price: Number(price),
-          unit
+          unit,
+          brand,
+          variety
         })
       });
       const data = await res.json();
@@ -139,6 +151,8 @@ export default function Inventory() {
         setSelectedItem(null);
         setName('');
         setPrice('');
+        setBrand('');
+        setVariety('');
         fetchItems();
       } else {
         setError(data.error || 'Failed to update item');
@@ -249,6 +263,8 @@ export default function Inventory() {
             <thead>
               <tr>
                 <th>Product Name</th>
+                <th>Brand</th>
+                <th>Variety</th>
                 <th>Category</th>
                 <th>Selling Price</th>
                 <th>Available Stock</th>
@@ -259,6 +275,8 @@ export default function Inventory() {
               {filteredItems.map(item => (
                 <tr key={item._id}>
                   <td style={{ fontWeight: 600 }}>{item.name}</td>
+                  <td>{item.brand || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No Brand</span>}</td>
+                  <td>{item.variety || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No Variety</span>}</td>
                   <td>
                     <span className="badge badge-info">{item.category}</span>
                   </td>
@@ -317,6 +335,29 @@ export default function Inventory() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                   />
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Brand</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Pioneer, IFFCO" 
+                      className="form-control"
+                      value={brand}
+                      onChange={(e) => setBrand(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Variety</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Lok-1, Neem Coated" 
+                      className="form-control"
+                      value={variety}
+                      onChange={(e) => setVariety(e.target.value)}
+                    />
+                  </div>
                 </div>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -407,6 +448,29 @@ export default function Inventory() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                   />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Brand</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Pioneer, IFFCO" 
+                      className="form-control"
+                      value={brand}
+                      onChange={(e) => setBrand(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Variety</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Lok-1, Neem Coated" 
+                      className="form-control"
+                      value={variety}
+                      onChange={(e) => setVariety(e.target.value)}
+                    />
+                  </div>
                 </div>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>

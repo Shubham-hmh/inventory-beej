@@ -6,6 +6,8 @@ export interface IItem extends Document {
   price: number; // Default selling price
   stock: number; // Current stock quantity
   unit: string;  // e.g., 'kg', 'bag', 'packet', 'litre'
+  brand?: string;
+  variety?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -17,6 +19,8 @@ const ItemSchema: Schema<IItem> = new Schema(
     price: { type: Number, required: true, min: 0 },
     stock: { type: Number, required: true, default: 0, min: 0 },
     unit: { type: String, required: true, default: 'kg', trim: true },
+    brand: { type: String, trim: true, default: '' },
+    variety: { type: String, trim: true, default: '' },
   },
   { timestamps: true }
 );

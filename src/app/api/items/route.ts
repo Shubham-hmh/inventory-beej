@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   try {
     await dbConnect();
     const body = await request.json();
-    const { name, category, price, stock, unit } = body;
+    const { name, category, price, stock, unit, brand, variety } = body;
 
     if (!name || !category || price === undefined) {
       return NextResponse.json({ success: false, error: 'Name, Category, and Price are required' }, { status: 400 });
@@ -28,6 +28,8 @@ export async function POST(request: Request) {
       price: Number(price),
       stock: Number(stock || 0),
       unit: unit || 'kg',
+      brand: brand || '',
+      variety: variety || '',
     });
 
     return NextResponse.json({ success: true, data: newItem }, { status: 201 });

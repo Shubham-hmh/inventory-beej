@@ -18,6 +18,8 @@ interface Item {
   price: number;
   stock: number;
   unit: string;
+  brand?: string;
+  variety?: string;
 }
 
 interface StockLog {
@@ -26,6 +28,8 @@ interface StockLog {
     _id: string;
     name: string;
     unit: string;
+    brand?: string;
+    variety?: string;
   } | null;
   quantity: number;
   unitPrice: number;
@@ -173,11 +177,18 @@ export default function StockInward() {
                 onChange={(e) => setSelectedItemId(e.target.value)}
               >
                 <option value="">-- Choose Item from Inventory --</option>
-                {items.map(item => (
-                  <option key={item._id} value={item._id}>
-                    {item.name} ({item.category}) — Current: {item.stock} {item.unit}
-                  </option>
-                ))}
+                {items.map(item => {
+                  const details = [
+                    item.brand && `Brand: ${item.brand}`,
+                    item.variety && `Variety: ${item.variety}`
+                  ].filter(Boolean).join(', ');
+                  const detailStr = details ? ` [${details}]` : '';
+                  return (
+                    <option key={item._id} value={item._id}>
+                      {item.name}{detailStr} ({item.category}) — Current: {item.stock} {item.unit}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
@@ -317,7 +328,12 @@ export default function StockInward() {
                     <tr key={log._id}>
                       <td>
                         <div style={{ fontWeight: 600 }}>{log.itemId?.name || 'Deleted Item'}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        {log.itemId && (log.itemId.brand || log.itemId.variety) && (
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                            ({log.itemId.brand || 'No Brand'} - {log.itemId.variety || 'No Variety'})
+                          </div>
+                        )}
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
                           {new Date(log.date).toLocaleDateString()}
                         </div>
                       </td>

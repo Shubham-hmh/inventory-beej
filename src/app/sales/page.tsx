@@ -23,6 +23,8 @@ interface Sale {
     itemId: {
       name: string;
       unit: string;
+      brand?: string;
+      variety?: string;
     } | null;
     quantity: number;
     price: number;
@@ -282,7 +284,14 @@ export default function SalesHistory() {
                   <tbody>
                     {selectedSale.items.map((it, idx) => (
                       <tr key={idx}>
-                        <td style={{ padding: '0.4rem 0' }}>{it.itemId?.name || 'Deleted Product'}</td>
+                        <td style={{ padding: '0.4rem 0' }}>
+                          <div>{it.itemId?.name || 'Deleted Product'}</div>
+                          {it.itemId && (it.itemId.brand || it.itemId.variety) && (
+                            <div style={{ fontSize: '0.75rem', color: '#666666' }}>
+                              ({it.itemId.brand || 'No Brand'} - {it.itemId.variety || 'No Variety'})
+                            </div>
+                          )}
+                        </td>
                         <td style={{ textAlign: 'center', padding: '0.4rem 0' }}>{it.quantity} {it.itemId?.unit || 'kg'}</td>
                         <td style={{ textAlign: 'right', padding: '0.4rem 0' }}>₹{it.price.toFixed(2)}</td>
                         <td style={{ textAlign: 'right', padding: '0.4rem 0' }}>₹{(it.quantity * it.price).toFixed(2)}</td>

@@ -33,6 +33,8 @@ interface Sale {
   paymentMode: 'Cash' | 'UPI' | 'Credit';
   date: string;
   notes?: string;
+  invoiceSequence?: number;
+  invoiceNumber?: string;
 }
 
 export default function SalesHistory() {
@@ -205,8 +207,9 @@ export default function SalesHistory() {
             <thead>
               <tr>
                 <th>Invoice Date</th>
-                <th>Invoice ID</th>
+                <th>Invoice No.</th>
                 <th>Buyer Information</th>
+                <th>Cashier</th>
                 <th>Payment Mode</th>
                 <th className="text-right">Total Amount</th>
                 <th className="text-right">Action</th>
@@ -216,14 +219,19 @@ export default function SalesHistory() {
               {filteredSales.map(sale => (
                 <tr key={sale._id}>
                   <td>{new Date(sale.date).toLocaleDateString()}</td>
-                  <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                    {sale._id.substring(0, 10)}...
+                  <td style={{ fontSize: '0.85rem', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
+                    {sale.invoiceNumber || 'N/A'}
                   </td>
                   <td>
                     <div style={{ fontWeight: 600 }}>{sale.customerId?.name || 'Walk-in Buyer'}</div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                       {sale.customerId?.phone}
                     </div>
+                  </td>
+                  <td>
+                    <span className="badge badge-secondary" style={{ textTransform: 'uppercase', fontWeight: 600, fontSize: '0.75rem' }}>
+                      {sale.invoiceNumber ? sale.invoiceNumber.replace(/[0-9]/g, '') : 'N/A'}
+                    </span>
                   </td>
                   <td>
                     <span className={`badge ${
@@ -257,7 +265,7 @@ export default function SalesHistory() {
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: '650px' }}>
             <div className="modal-header">
-              <h3 className="modal-title">Sales Invoice #{selectedSale._id.substring(0, 12)}</h3>
+              <h3 className="modal-title">Sales Invoice #{selectedSale.invoiceNumber || selectedSale._id.substring(0, 12)}</h3>
               <button className="modal-close" onClick={() => { setIsModalOpen(false); setSelectedSale(null); }}>
                 <X size={20} />
               </button>
@@ -273,12 +281,13 @@ export default function SalesHistory() {
                 </div>
 
                 <div style={{ fontSize: '0.85rem', marginBottom: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                  <div><strong>Invoice ID:</strong> {selectedSale._id}</div>
+                  <div><strong>Invoice No:</strong> {selectedSale.invoiceNumber || selectedSale._id}</div>
                   <div><strong>Date:</strong> {new Date(selectedSale.date).toLocaleDateString()}</div>
                   <div><strong>Customer:</strong> {selectedSale.customerId?.name || 'Walk-in'}</div>
                   <div><strong>Phone:</strong> {selectedSale.customerId?.phone || 'N/A'}</div>
                   {selectedSale.customerId?.address && <div><strong>Address:</strong> {selectedSale.customerId.address}</div>}
                   <div><strong>Payment Type:</strong> {selectedSale.paymentMode}</div>
+                  <div><strong>Cashier Initials:</strong> {selectedSale.invoiceNumber ? selectedSale.invoiceNumber.replace(/[0-9]/g, '') : 'N/A'}</div>
                 </div>
 
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', marginBottom: '1rem' }}>

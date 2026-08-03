@@ -3,6 +3,7 @@ import dbConnect from '@/lib/dbConnect';
 import Sale from '@/lib/models/Sale';
 import Customer from '@/lib/models/Customer';
 import Item from '@/lib/models/Item';
+import { getSessionUser } from '@/lib/auth';
 
 export async function GET() {
   try {
@@ -10,6 +11,7 @@ export async function GET() {
     const sales = await Sale.find({})
       .populate('customerId')
       .populate('items.itemId')
+      .populate('createdBy', 'name username')
       .sort({ date: -1, createdAt: -1 });
     return NextResponse.json({ success: true, data: sales });
   } catch (error: any) {
@@ -20,6 +22,13 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     await dbConnect();
+    
+    // Auth Check
+    const session = await getSessionUser();
+    if (!session) {
+      return NextResponse.json({ success: false, error: 'Unauthorized: Session missing' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { customer, items, paymentMode, date, notes } = body;
 
@@ -92,7 +101,23 @@ export async function POST(request: Request) {
       await Item.findByIdAndUpdate(itemId, { $inc: { stock: -qty } });
     }
 
-    // 3. Create the sale transaction
+    // 3. Generate sequential invoice number and cashier initials
+    const getInitials = (fullName: string) => {
+      if (!fullName) return 'EMP';
+      return fullName
+        .split(' ')
+        .filter(Boolean)
+        .map(w => w[0].toUpperCase())
+        .join('')
+        .substring(0, 3);
+    };
+    const initials = getInitials(session.name);
+
+    const lastSale = await Sale.findOne({}).sort({ invoiceSequence: -1 });
+    const nextSequence = lastSale && lastSale.invoiceSequence ? lastSale.invoiceSequence + 1 : 1;
+    const invoiceNumber = `${initials}${nextSequence}`;
+
+    // 4. Create the sale transaction
     const newSale = await Sale.create({
       customerId: dbCustomer._id,
       items: saleItems,
@@ -100,6 +125,9 @@ export async function POST(request: Request) {
       paymentMode: paymentMode || 'Cash',
       date: date ? new Date(date) : new Date(),
       notes: notes || '',
+      invoiceSequence: nextSequence,
+      invoiceNumber: invoiceNumber,
+      createdBy: session.id,
     });
 
     return NextResponse.json({ success: true, data: newSale }, { status: 201 });

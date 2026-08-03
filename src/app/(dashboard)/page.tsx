@@ -40,6 +40,8 @@ interface Sale {
   totalAmount: number;
   paymentMode: string;
   date: string;
+  invoiceSequence?: number;
+  invoiceNumber?: string;
 }
 
 interface StockInput {
@@ -257,7 +259,7 @@ export default function Dashboard() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Buyer</th>
+                    <th>Invoice / Buyer</th>
                     <th>Items</th>
                     <th className="text-right">Total</th>
                   </tr>
@@ -266,7 +268,15 @@ export default function Dashboard() {
                   {recentSales.map(sale => (
                     <tr key={sale._id}>
                       <td>
-                        <div style={{ fontWeight: 500 }}>{sale.customerId?.name || 'Walk-in Buyer'}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--primary)', fontFamily: 'var(--font-mono)' }}>
+                            {sale.invoiceNumber || 'N/A'}
+                          </span>
+                          <span className="badge badge-secondary" style={{ textTransform: 'uppercase', fontSize: '0.65rem', fontWeight: 600, padding: '0.1rem 0.3rem' }} title="Cashier initials">
+                            {sale.invoiceNumber ? sale.invoiceNumber.replace(/[0-9]/g, '') : 'N/A'}
+                          </span>
+                        </div>
+                        <div style={{ fontWeight: 500, fontSize: '0.85rem', marginTop: '0.15rem' }}>{sale.customerId?.name || 'Walk-in Buyer'}</div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                           {new Date(sale.date).toLocaleDateString()}
                         </div>

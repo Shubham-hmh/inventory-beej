@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 import './Customer';
 import './Item';
+import './User';
 
 export interface ISaleItem {
   itemId: mongoose.Types.ObjectId;
@@ -15,6 +16,9 @@ export interface ISale extends Document {
   paymentMode: 'Cash' | 'UPI' | 'Credit';
   date: Date;
   notes: string;
+  invoiceSequence: number;
+  invoiceNumber: string;
+  createdBy: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -33,6 +37,9 @@ const SaleSchema: Schema<ISale> = new Schema(
     paymentMode: { type: String, enum: ['Cash', 'UPI', 'Credit'], default: 'Cash', required: true },
     date: { type: Date, required: true, default: Date.now },
     notes: { type: String, trim: true },
+    invoiceSequence: { type: Number, required: true, unique: true },
+    invoiceNumber: { type: String, required: true, unique: true },
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   },
   { timestamps: true }
 );

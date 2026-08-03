@@ -595,11 +595,12 @@ export default function NewSale() {
               </div>
 
               <div style={{ fontSize: '0.9rem', marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                <div><strong>Invoice ID:</strong> {createdInvoice._id}</div>
+                <div><strong>Invoice No:</strong> {createdInvoice.invoiceNumber || createdInvoice._id}</div>
                 <div><strong>Date:</strong> {new Date(createdInvoice.date).toLocaleDateString()}</div>
                 <div><strong>Customer:</strong> {createdInvoice.customer.name}</div>
                 {createdInvoice.customer.address && <div><strong>Address:</strong> {createdInvoice.customer.address}</div>}
                 <div><strong>Payment:</strong> {createdInvoice.paymentMode}</div>
+                <div><strong>Cashier Initials:</strong> {createdInvoice.invoiceNumber ? createdInvoice.invoiceNumber.replace(/[0-9]/g, '') : 'N/A'}</div>
               </div>
 
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginBottom: '1.5rem' }}>

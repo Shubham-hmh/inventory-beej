@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { 
   TrendingUp, 
   Package, 
@@ -54,6 +55,7 @@ interface StockInput {
 }
 
 export default function Dashboard() {
+  const router = useRouter();
   const [items, setItems] = useState<Item[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [stockLogs, setStockLogs] = useState<StockInput[]>([]);
@@ -65,6 +67,19 @@ export default function Dashboard() {
     async function fetchData() {
       try {
         setLoading(true);
+        // Verify user session & role first
+        const resMe = await fetch('/api/auth/me');
+        const dataMe = await resMe.json();
+        if (dataMe.success) {
+          if (dataMe.data.role === 'employee') {
+            router.push('/sales/new');
+            return;
+          }
+        } else {
+          router.push('/login');
+          return;
+        }
+
         // Fetch Items
         const resItems = await fetch('/api/items');
         const dataItems = await resItems.json();

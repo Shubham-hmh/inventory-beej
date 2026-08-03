@@ -62,6 +62,15 @@ export default function StockInward() {
   const loadData = async () => {
     try {
       setLoading(true);
+      
+      // Role Guard Check: Employees cannot record/view stock arrivals
+      const resMe = await fetch('/api/auth/me');
+      const dataMe = await resMe.json();
+      if (dataMe.success && dataMe.data.role === 'employee') {
+        window.location.href = '/sales/new';
+        return;
+      }
+
       const resItems = await fetch('/api/items');
       const dataItems = await resItems.json();
       if (dataItems.success) {

@@ -48,6 +48,15 @@ export default function Inventory() {
   const fetchItems = async () => {
     try {
       setLoading(true);
+      
+      // Role Guard Check: Employees cannot manage catalog
+      const resMe = await fetch('/api/auth/me');
+      const dataMe = await resMe.json();
+      if (dataMe.success && dataMe.data.role === 'employee') {
+        window.location.href = '/sales/new';
+        return;
+      }
+
       const res = await fetch('/api/items');
       const data = await res.json();
       if (data.success) {

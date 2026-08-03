@@ -53,6 +53,15 @@ export default function SalesHistory() {
     async function fetchSales() {
       try {
         setLoading(true);
+        
+        // Role Guard Check: Employees cannot view sales history logs
+        const resMe = await fetch('/api/auth/me');
+        const dataMe = await resMe.json();
+        if (dataMe.success && dataMe.data.role === 'employee') {
+          window.location.href = '/sales/new';
+          return;
+        }
+
         const res = await fetch('/api/sales');
         const data = await res.json();
         if (data.success) {

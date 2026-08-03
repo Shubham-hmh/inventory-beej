@@ -54,6 +54,15 @@ export default function CustomersRegistry() {
     async function loadData() {
       try {
         setLoading(true);
+        
+        // Role Guard Check: Employees cannot view directories
+        const resMe = await fetch('/api/auth/me');
+        const dataMe = await resMe.json();
+        if (dataMe.success && dataMe.data.role === 'employee') {
+          window.location.href = '/sales/new';
+          return;
+        }
+
         const resCust = await fetch('/api/customers');
         const dataCust = await resCust.json();
         

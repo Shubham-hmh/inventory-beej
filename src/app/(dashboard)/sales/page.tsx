@@ -444,7 +444,7 @@ export default function SalesHistory() {
                         sale.paymentMode === 'Cash' ? 'badge-success' : 
                         sale.paymentMode === 'UPI' ? 'badge-info' : 'badge-warning'
                       }`}>
-                        {sale.paymentMode}
+                        {sale.paymentMode === 'Credit' ? 'Credit / Udhaar' : sale.paymentMode}
                       </span>
                     </td>
                     <td className="text-right" style={{ fontWeight: 600, color: 'var(--primary)' }}>
@@ -503,7 +503,7 @@ export default function SalesHistory() {
                   <div><strong>Customer:</strong> {selectedSale.customerId?.name || 'Walk-in'}</div>
                   <div><strong>Phone:</strong> {selectedSale.customerId?.phone || 'N/A'}</div>
                   {selectedSale.customerId?.address && <div><strong>Address:</strong> {selectedSale.customerId.address}</div>}
-                  <div><strong>Payment Type:</strong> {selectedSale.paymentMode}</div>
+                  <div><strong>Payment Type:</strong> {selectedSale.paymentMode === 'Credit' ? 'Credit / Udhaar' : selectedSale.paymentMode}</div>
                   <div><strong>Cashier Initials:</strong> {selectedSale.invoiceNumber ? selectedSale.invoiceNumber.replace(/[0-9]/g, '') : 'N/A'}</div>
                 </div>
 

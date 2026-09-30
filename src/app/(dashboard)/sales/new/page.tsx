@@ -50,6 +50,7 @@ interface ExistingSale {
 interface CartItem {
   itemId: string;
   name: string;
+  category?: string;
   brand?: string;
   variety?: string;
   quantity: number;
@@ -95,6 +96,9 @@ export default function NewSale() {
 
   // Cart Build State
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [itemMode, setItemMode] = useState<'catalog' | 'custom'>('catalog');
+  
+  // Catalog item fields
   const [selectedItemId, setSelectedItemId] = useState('');
   const [selectedProductName, setSelectedProductName] = useState('');
   const [selectedBrand, setSelectedBrand] = useState('');
@@ -102,6 +106,15 @@ export default function NewSale() {
   const [salePrice, setSalePrice] = useState('');
   const [saleQty, setSaleQty] = useState('');
   const [itemDiscount, setItemDiscount] = useState('');
+
+  // Custom item fields (not in stock)
+  const [customName, setCustomName] = useState('');
+  const [customCategory, setCustomCategory] = useState('Other');
+  const [customUnit, setCustomUnit] = useState('kg');
+  const [customPrice, setCustomPrice] = useState('');
+  const [customQty, setCustomQty] = useState('1');
+  const [customDiscount, setCustomDiscount] = useState('');
+
   const [billDiscount, setBillDiscount] = useState('');
 
   // Sale metadata
@@ -362,6 +375,44 @@ export default function NewSale() {
     setError('');
   };
 
+  const handleAddCustomToInvoice = () => {
+    if (!customName.trim() || !customPrice || !customQty) {
+      setError('Please enter product name, selling rate, and quantity for custom product.');
+      return;
+    }
+
+    const qty = Number(customQty);
+    const rawPrice = Number(customPrice);
+    const disc = Math.max(0, Number(customDiscount) || 0);
+    const finalPrice = Math.max(0, rawPrice - disc);
+
+    if (qty <= 0) {
+      setError('Quantity must be greater than 0.');
+      return;
+    }
+
+    setCart([
+      ...cart,
+      {
+        itemId: '',
+        name: customName.trim(),
+        category: customCategory,
+        unit: customUnit || 'kg',
+        brand: '',
+        variety: '',
+        quantity: qty,
+        price: finalPrice,
+        maxStock: 999999,
+      },
+    ]);
+
+    setCustomName('');
+    setCustomPrice('');
+    setCustomQty('1');
+    setCustomDiscount('');
+    setError('');
+  };
+
   const handleRemoveFromCart = (index: number) => {
     setCart(cart.filter((_, idx) => idx !== index));
   };
@@ -413,7 +464,12 @@ export default function NewSale() {
         isNewCustomer,
         discount: discountVal,
         items: cart.map(c => ({
-          itemId: c.itemId,
+          itemId: c.itemId || undefined,
+          name: c.name,
+          category: c.category,
+          unit: c.unit,
+          brand: c.brand,
+          variety: c.variety,
           quantity: c.quantity,
           price: c.price
         })),
@@ -633,7 +689,7 @@ export default function NewSale() {
                         cursor: 'pointer',
                         borderBottom: '1px solid rgba(255,255,255,0.05)',
                         display: 'flex',
-                        justify: 'space-between',
+                        justifyContent: 'space-between',
                         alignItems: 'center'
                       }}
                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)')}
@@ -764,164 +820,292 @@ export default function NewSale() {
               </span>
             </div>
 
-            {/* Direct 1-Click Product Selector Dropdown */}
-            <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-              <label className="form-label" style={{ fontWeight: 600, color: '#f3f4f6' }}>
-                ⚡ Instant Product & Variety Dropdown (1-Click Selection)
-              </label>
-              <select
-                className="form-control"
-                style={selectStyle}
-                value={selectedItemId}
-                onChange={(e) => handleDirectItemSelect(e.target.value)}
+            {/* Mode Switcher Tabs */}
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}>
+              <button
+                type="button"
+                onClick={() => setItemMode('catalog')}
+                className={`btn ${itemMode === 'catalog' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ flex: 1, fontSize: '0.8rem', padding: '0.5rem 0.6rem' }}
               >
-                <option value="" style={optionStyle}>-- Direct Search & Choose Item --</option>
-                {items.map(it => (
-                  <option key={it._id} value={it._id} style={optionStyle}>
-                    {it.name} {it.brand ? `[${it.brand}]` : ''} {it.variety ? `(${it.variety})` : ''} — ₹{it.price}/{cleanUnitName(it.unit) || 'unit'} (Stock: {it.stock} {cleanUnitName(it.unit)})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ textTransform: 'uppercase', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: '0.75rem', textAlign: 'center' }}>
-              — OR FILTER BY CATEGORY / BRAND —
-            </div>
-
-            {/* Cascading Filter Selection */}
-            <div className="form-group">
-              <label className="form-label">Product Name</label>
-              <select
-                className="form-control"
-                style={selectStyle}
-                value={selectedProductName}
-                onChange={(e) => {
-                  setSelectedProductName(e.target.value);
-                  setSelectedBrand('');
-                  setSelectedVariety('');
-                  setSelectedItemId('');
-                }}
+                <Package size={15} />
+                <span>Catalog Stock Items</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setItemMode('custom')}
+                className={`btn ${itemMode === 'custom' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ flex: 1, fontSize: '0.8rem', padding: '0.5rem 0.6rem' }}
               >
-                <option value="" style={optionStyle}>-- Choose Product Name --</option>
-                {distinctProductNames.map(name => (
-                  <option key={name} value={name} style={optionStyle}>{name}</option>
-                ))}
-              </select>
+                <Plus size={15} />
+                <span>+ Custom Direct Item</span>
+              </button>
             </div>
 
-            {selectedProductName && (
-              <div className="grid-2col" style={{ marginBottom: '1.25rem' }}>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Brand</label>
+            {itemMode === 'catalog' ? (
+              <>
+                {/* Direct 1-Click Product Selector Dropdown */}
+                <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                  <label className="form-label" style={{ fontWeight: 600, color: '#f3f4f6' }}>
+                    ⚡ Instant Product Dropdown (1-Click Selection)
+                  </label>
                   <select
                     className="form-control"
                     style={selectStyle}
-                    value={selectedBrand}
+                    value={selectedItemId}
+                    onChange={(e) => handleDirectItemSelect(e.target.value)}
+                  >
+                    <option value="" style={optionStyle}>-- Direct Search & Choose Item --</option>
+                    {items.map(it => (
+                      <option key={it._id} value={it._id} style={optionStyle}>
+                        {it.name} {it.brand ? `[${it.brand}]` : ''} {it.variety ? `(${it.variety})` : ''} — ₹{it.price}/{cleanUnitName(it.unit) || 'unit'} (Stock: {it.stock} {cleanUnitName(it.unit)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ textTransform: 'uppercase', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: '0.75rem', textAlign: 'center' }}>
+                  — OR FILTER BY CATEGORY / BRAND —
+                </div>
+
+                {/* Cascading Filter Selection */}
+                <div className="form-group">
+                  <label className="form-label">Product Name</label>
+                  <select
+                    className="form-control"
+                    style={selectStyle}
+                    value={selectedProductName}
                     onChange={(e) => {
-                      setSelectedBrand(e.target.value);
+                      setSelectedProductName(e.target.value);
+                      setSelectedBrand('');
                       setSelectedVariety('');
                       setSelectedItemId('');
                     }}
                   >
-                    <option value="" style={optionStyle}>-- Choose Brand --</option>
-                    {availableBrands.map(b => (
-                      <option key={b} value={b} style={optionStyle}>{b}</option>
+                    <option value="" style={optionStyle}>-- Choose Product Name --</option>
+                    {distinctProductNames.map(name => (
+                      <option key={name} value={name} style={optionStyle}>{name}</option>
                     ))}
                   </select>
                 </div>
 
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Variety</label>
-                  <select
-                    className="form-control"
-                    style={selectStyle}
-                    value={selectedVariety}
-                    disabled={!selectedBrand}
-                    onChange={(e) => setSelectedVariety(e.target.value)}
-                  >
-                    <option value="" style={optionStyle}>-- Choose Variety --</option>
-                    {availableVarieties.map(v => (
-                      <option key={v} value={v} style={optionStyle}>{v}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            )}
+                {selectedProductName && (
+                  <div className="grid-2col" style={{ marginBottom: '1.25rem' }}>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label">Brand</label>
+                      <select
+                        className="form-control"
+                        style={selectStyle}
+                        value={selectedBrand}
+                        onChange={(e) => {
+                          setSelectedBrand(e.target.value);
+                          setSelectedVariety('');
+                          setSelectedItemId('');
+                        }}
+                      >
+                        <option value="" style={optionStyle}>-- Choose Brand --</option>
+                        {availableBrands.map(b => (
+                          <option key={b} value={b} style={optionStyle}>{b}</option>
+                        ))}
+                      </select>
+                    </div>
 
-            {/* Quantity, Unit Price, Item Discount Input */}
-            {activeItem && (
-              <div style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                border: '1px solid var(--border-color)',
-                borderRadius: 'var(--radius-md)',
-                padding: '1.25rem',
-                marginTop: '1rem'
-              }}>
-                <div className="flex-between" style={{ marginBottom: '1rem' }}>
-                  <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
-                    Selected: <span style={{ color: 'var(--primary)' }}>{activeItem.name}</span>
-                    {activeItem.variety ? ` (${activeItem.variety})` : ''}
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label">Variety</label>
+                      <select
+                        className="form-control"
+                        style={selectStyle}
+                        value={selectedVariety}
+                        disabled={!selectedBrand}
+                        onChange={(e) => setSelectedVariety(e.target.value)}
+                      >
+                        <option value="" style={optionStyle}>-- Choose Variety --</option>
+                        {availableVarieties.map(v => (
+                          <option key={v} value={v} style={optionStyle}>{v}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                  <span className={`badge ${activeItem.stock > 10 ? 'badge-success' : 'badge-danger'}`}>
-                    Available Stock: {activeItem.stock} {cleanUnitName(activeItem.unit) || 'units'}
-                  </span>
+                )}
+
+                {/* Quantity, Unit Price, Item Discount Input */}
+                {activeItem && (
+                  <div style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '1.25rem',
+                    marginTop: '1rem'
+                  }}>
+                    <div className="flex-between" style={{ marginBottom: '1rem' }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+                        Selected: <span style={{ color: 'var(--primary)' }}>{activeItem.name}</span>
+                        {activeItem.variety ? ` (${activeItem.variety})` : ''}
+                      </div>
+                      <span className={`badge ${activeItem.stock > 10 ? 'badge-success' : 'badge-danger'}`}>
+                        Available Stock: {activeItem.stock} {cleanUnitName(activeItem.unit) || 'units'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label">
+                          Quantity {cleanUnitName(activeItem.unit) ? `(${cleanUnitName(activeItem.unit)})` : ''} *
+                        </label>
+                        <input 
+                          type="number" 
+                          step="any"
+                          min="0.1"
+                          className="form-control"
+                          value={saleQty}
+                          onChange={(e) => setSaleQty(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label">Price / Unit (₹) *</label>
+                        <input 
+                          type="number" 
+                          step="any"
+                          min="0"
+                          className="form-control"
+                          value={salePrice}
+                          onChange={(e) => setSalePrice(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label">Item Discount (₹)</label>
+                        <input 
+                          type="number" 
+                          step="any"
+                          min="0"
+                          placeholder="0"
+                          className="form-control"
+                          value={itemDiscount}
+                          onChange={(e) => setItemDiscount(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    {itemDiscount && Number(itemDiscount) > 0 && (
+                      <div style={{ fontSize: '0.8rem', color: 'var(--success)', marginTop: '0.75rem', fontWeight: 600 }}>
+                        ✓ Net Unit Rate: ₹{Math.max(0, Number(salePrice || 0) - Number(itemDiscount))} / {cleanUnitName(activeItem.unit) || 'unit'} (Discount: ₹{itemDiscount})
+                      </div>
+                    )}
+
+                    <button 
+                      type="button" 
+                      className="btn btn-primary" 
+                      style={{ width: '100%', marginTop: '1.25rem', padding: '0.85rem' }}
+                      onClick={handleAddToInvoice}
+                    >
+                      <Plus size={18} />
+                      <span>Add Product to Cart</span>
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              /* Custom Direct Non-Catalog Item Form */
+              <div style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                border: '1px dashed var(--primary)',
+                borderRadius: 'var(--radius-md)',
+                padding: '1.25rem'
+              }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 600, marginBottom: '1rem' }}>
+                  ✨ Sell Direct / Non-Catalog Product (No stock entry required)
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Product Name *</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Custom Hybrid Seeds or Special Fertilizer" 
+                    className="form-control"
+                    value={customName}
+                    onChange={(e) => setCustomName(e.target.value)}
+                  />
+                </div>
+
+                <div className="grid-2col" style={{ marginBottom: '1rem' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Category</label>
+                    <select 
+                      className="form-control" 
+                      style={selectStyle} 
+                      value={customCategory} 
+                      onChange={(e) => setCustomCategory(e.target.value)}
+                    >
+                      <option value="Seeds" style={optionStyle}>Seeds</option>
+                      <option value="Fertilizer" style={optionStyle}>Fertilizer</option>
+                      <option value="Pesticide" style={optionStyle}>Pesticide</option>
+                      <option value="Tools" style={optionStyle}>Tools</option>
+                      <option value="Other" style={optionStyle}>Other</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Unit of Measure</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. kg, bag, pkt, litre" 
+                      className="form-control"
+                      value={customUnit}
+                      onChange={(e) => setCustomUnit(e.target.value)}
+                    />
+                  </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
                   <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">
-                      Quantity {cleanUnitName(activeItem.unit) ? `(${cleanUnitName(activeItem.unit)})` : ''} *
-                    </label>
+                    <label className="form-label">Quantity *</label>
                     <input 
                       type="number" 
                       step="any"
                       min="0.1"
                       className="form-control"
-                      value={saleQty}
-                      onChange={(e) => setSaleQty(e.target.value)}
+                      value={customQty}
+                      onChange={(e) => setCustomQty(e.target.value)}
                     />
                   </div>
 
                   <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">Price / Unit (₹) *</label>
+                    <label className="form-label">Selling Rate / Unit (₹) *</label>
                     <input 
                       type="number" 
                       step="any"
                       min="0"
+                      placeholder="Price per unit" 
                       className="form-control"
-                      value={salePrice}
-                      onChange={(e) => setSalePrice(e.target.value)}
+                      value={customPrice}
+                      onChange={(e) => setCustomPrice(e.target.value)}
                     />
                   </div>
 
                   <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">Item Discount (₹)</label>
+                    <label className="form-label">Discount (₹)</label>
                     <input 
                       type="number" 
                       step="any"
                       min="0"
-                      placeholder="0"
+                      placeholder="0" 
                       className="form-control"
-                      value={itemDiscount}
-                      onChange={(e) => setItemDiscount(e.target.value)}
+                      value={customDiscount}
+                      onChange={(e) => setCustomDiscount(e.target.value)}
                     />
                   </div>
                 </div>
-
-                {itemDiscount && Number(itemDiscount) > 0 && (
-                  <div style={{ fontSize: '0.8rem', color: 'var(--success)', marginTop: '0.75rem', fontWeight: 600 }}>
-                    ✓ Net Unit Rate: ₹{Math.max(0, Number(salePrice || 0) - Number(itemDiscount))} / {cleanUnitName(activeItem.unit) || 'unit'} (Discount: ₹{itemDiscount})
-                  </div>
-                )}
 
                 <button 
                   type="button" 
                   className="btn btn-primary" 
                   style={{ width: '100%', marginTop: '1.25rem', padding: '0.85rem' }}
-                  onClick={handleAddToInvoice}
+                  onClick={handleAddCustomToInvoice}
                 >
                   <Plus size={18} />
-                  <span>Add Product to Cart</span>
+                  <span>Add Custom Product to Cart</span>
                 </button>
               </div>
             )}
@@ -1156,7 +1340,7 @@ export default function NewSale() {
                 <div><strong>Date:</strong> {new Date(createdInvoice.date).toLocaleDateString()}</div>
                 <div><strong>Customer:</strong> {createdInvoice.customer?.name}</div>
                 {createdInvoice.customer?.address && <div><strong>Address:</strong> {createdInvoice.customer.address}</div>}
-                <div><strong>Payment:</strong> {createdInvoice.paymentMode}</div>
+                <div><strong>Payment:</strong> {createdInvoice.paymentMode === 'Credit' ? 'Credit / Udhaar' : createdInvoice.paymentMode}</div>
                 <div><strong>Cashier Initials:</strong> {createdInvoice.invoiceNumber ? createdInvoice.invoiceNumber.replace(/[0-9]/g, '') : 'N/A'}</div>
               </div>
 

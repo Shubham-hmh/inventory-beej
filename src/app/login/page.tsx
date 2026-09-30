@@ -27,7 +27,7 @@ export default function LoginPage() {
         if (data.success) {
           setHasAdmin(data.hasAdmin);
         } else {
-          setError('Failed to check database setup status.');
+          setError(data.error || 'Failed to check database setup status.');
         }
       } catch (err) {
         setError('Network error connecting to database.');

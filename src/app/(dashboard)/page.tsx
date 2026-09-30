@@ -364,7 +364,7 @@ export default function Dashboard() {
                       })}
                     </span>
                     <span className="badge badge-secondary" style={{ textTransform: 'uppercase', fontSize: '0.65rem' }}>
-                      {sale.paymentMode || 'Cash'}
+                      {sale.paymentMode === 'Credit' ? 'Credit / Udhaar' : sale.paymentMode || 'Cash'}
                     </span>
                   </div>
                 </div>
@@ -405,7 +405,7 @@ export default function Dashboard() {
                   padding: '1rem',
                   display: 'flex',
                   alignItems: 'center',
-                  justify: 'space-between',
+                  justifyContent: 'space-between',
                   gap: '1rem'
                 }}>
                   <div>

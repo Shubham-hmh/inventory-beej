@@ -184,10 +184,10 @@ export async function POST(request: Request) {
     const saleItems = [];
 
     for (const itemInput of items) {
-      const { itemId, quantity, price } = itemInput;
-      if (!itemId || quantity === undefined || price === undefined) {
+      const { itemId, quantity, price, name, category, unit, brand, variety, isCustom } = itemInput;
+      if (quantity === undefined || price === undefined) {
         return NextResponse.json(
-          { success: false, error: 'Each item must have itemId, quantity, and price' },
+          { success: false, error: 'Each item must have quantity and price' },
           { status: 400 }
         );
       }
@@ -202,21 +202,41 @@ export async function POST(request: Request) {
         );
       }
 
-      // Verify item exists
-      const dbItem = await Item.findById(itemId);
-      if (!dbItem) {
-        return NextResponse.json({ success: false, error: `Item with ID ${itemId} not found` }, { status: 404 });
+      let dbItem = itemId ? await Item.findById(itemId).catch(() => null) : null;
+
+      // Auto-register custom non-catalog item if not already in database
+      if (!dbItem && (isCustom || name)) {
+        const cleanItemName = (name || 'Custom Item').trim();
+        const escapedName = cleanItemName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        dbItem = await Item.findOne({ name: { $regex: new RegExp(`^${escapedName}$`, 'i') } });
+        
+        if (!dbItem) {
+          dbItem = await Item.create({
+            name: cleanItemName,
+            category: category || 'Other',
+            price: sellPrice,
+            stock: 0,
+            unit: unit || 'kg',
+            brand: brand || '',
+            variety: variety || ''
+          });
+        }
       }
 
+      if (!dbItem) {
+        return NextResponse.json({ success: false, error: `Product item not found` }, { status: 404 });
+      }
+
+      const resolvedItemId = dbItem._id;
       calculatedTotal += qty * sellPrice;
       saleItems.push({
-        itemId,
+        itemId: resolvedItemId,
         quantity: qty,
         price: sellPrice,
       });
 
       // Update stock level: subtract the quantity sold
-      await Item.findByIdAndUpdate(itemId, { $inc: { stock: -qty } });
+      await Item.findByIdAndUpdate(resolvedItemId, { $inc: { stock: -qty } });
     }
 
     // 3. Check for existing sale record to append into (if existing customer and not flagged as new)

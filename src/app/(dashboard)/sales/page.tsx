@@ -69,6 +69,13 @@ export default function SalesHistory() {
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Custom Delete Confirm Modal State
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    type: 'single' | 'bulk';
+    targetSale?: Sale;
+  } | null>(null);
+
   // Multi-select for Batch Delete
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -122,78 +129,73 @@ export default function SalesHistory() {
     setIsModalOpen(true);
   };
 
-  const handleDeleteSale = async (sale: Sale) => {
-    const invName = sale.invoiceNumber || `#${sale._id.substring(sale._id.length - 6)}`;
-    const confirmMsg = `Are you sure you want to delete Invoice ${invName}?\n\n` +
-      `Total Amount: ₹${sale.totalAmount.toLocaleString('en-IN')}\n` +
-      `Items: ${sale.items.length} product(s)\n\n` +
-      `• The items in this sale will be automatically restored back to inventory stock.`;
-
-    if (!window.confirm(confirmMsg)) {
-      return;
-    }
-
-    try {
-      setDeletingId(sale._id);
-      const res = await fetch(`/api/sales/${sale._id}`, {
-        method: 'DELETE',
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        showNotification(`Invoice ${invName} deleted successfully. Stock has been restored.`);
-        setSales(prev => prev.filter(s => s._id !== sale._id));
-        setSelectedIds(prev => prev.filter(id => id !== sale._id));
-        if (selectedSale?._id === sale._id) {
-          setIsModalOpen(false);
-          setSelectedSale(null);
-        }
-      } else {
-        showNotification(data.error || 'Failed to delete sale record.', true);
-      }
-    } catch (err: any) {
-      showNotification('Network error occurred while deleting sale record.', true);
-    } finally {
-      setDeletingId(null);
-    }
+  const handleDeleteSale = (sale: Sale) => {
+    setDeleteModal({ isOpen: true, type: 'single', targetSale: sale });
   };
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     if (selectedIds.length === 0) return;
+    setDeleteModal({ isOpen: true, type: 'bulk' });
+  };
 
-    const count = selectedIds.length;
-    const confirmMsg = `Are you sure you want to delete ${count} selected sale records?\n\n` +
-      `• All items sold in these ${count} sales will be restored back into inventory stock.\n` +
-      `• This action cannot be undone.`;
+  const executeConfirmDelete = async () => {
+    if (!deleteModal) return;
 
-    if (!window.confirm(confirmMsg)) {
-      return;
-    }
+    if (deleteModal.type === 'single' && deleteModal.targetSale) {
+      const sale = deleteModal.targetSale;
+      const invName = sale.invoiceNumber || `#${sale._id.substring(sale._id.length - 6)}`;
+      try {
+        setDeletingId(sale._id);
+        const res = await fetch(`/api/sales/${sale._id}`, {
+          method: 'DELETE',
+        });
+        const data = await res.json();
 
-    try {
-      setIsBulkDeleting(true);
-      const res = await fetch('/api/sales', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: selectedIds, restoreStock: true }),
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        showNotification(`Successfully deleted ${count} sale records and restored stock.`);
-        setSales(prev => prev.filter(s => !selectedIds.includes(s._id)));
-        setSelectedIds([]);
-        if (selectedSale && selectedIds.includes(selectedSale._id)) {
-          setIsModalOpen(false);
-          setSelectedSale(null);
+        if (data.success) {
+          showNotification(`Invoice ${invName} deleted successfully. Stock has been restored.`);
+          setSales(prev => prev.filter(s => s._id !== sale._id));
+          setSelectedIds(prev => prev.filter(id => id !== sale._id));
+          if (selectedSale?._id === sale._id) {
+            setIsModalOpen(false);
+            setSelectedSale(null);
+          }
+        } else {
+          showNotification(data.error || 'Failed to delete sale record.', true);
         }
-      } else {
-        showNotification(data.error || 'Failed to delete selected sales.', true);
+      } catch (err: any) {
+        showNotification('Network error occurred while deleting sale record.', true);
+      } finally {
+        setDeletingId(null);
+        setDeleteModal(null);
       }
-    } catch (err: any) {
-      showNotification('Network error deleting selected sales.', true);
-    } finally {
-      setIsBulkDeleting(false);
+    } else if (deleteModal.type === 'bulk') {
+      const count = selectedIds.length;
+      try {
+        setIsBulkDeleting(true);
+        const res = await fetch('/api/sales', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: selectedIds, restoreStock: true }),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          showNotification(`Successfully deleted ${count} sale records and restored stock.`);
+          setSales(prev => prev.filter(s => !selectedIds.includes(s._id)));
+          setSelectedIds([]);
+          if (selectedSale && selectedIds.includes(selectedSale._id)) {
+            setIsModalOpen(false);
+            setSelectedSale(null);
+          }
+        } else {
+          showNotification(data.error || 'Failed to delete selected sales.', true);
+        }
+      } catch (err: any) {
+        showNotification('Network error deleting selected sales.', true);
+      } finally {
+        setIsBulkDeleting(false);
+        setDeleteModal(null);
+      }
     }
   };
 
@@ -650,6 +652,98 @@ export default function SalesHistory() {
                   Close
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Delete Confirmation Modal */}
+      {deleteModal?.isOpen && (
+        <div className="modal-overlay" style={{ zIndex: 1100 }}>
+          <div className="modal-content" style={{ maxWidth: '450px', border: '1px solid rgba(239, 68, 68, 0.3)', background: '#111827', color: '#f9fafb' }}>
+            <div className="modal-header" style={{ borderBottom: '1px solid #1f2937' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ padding: '0.5rem', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}>
+                  <AlertTriangle size={24} />
+                </div>
+                <div>
+                  <h3 className="modal-title" style={{ color: '#f9fafb', fontSize: '1.1rem', margin: 0 }}>
+                    {deleteModal.type === 'single' ? 'Delete Sale Record?' : `Delete ${selectedIds.length} Sale Records?`}
+                  </h3>
+                  <p style={{ margin: '0.1rem 0 0 0', fontSize: '0.75rem', color: '#9ca3af' }}>This action cannot be undone</p>
+                </div>
+              </div>
+              <button className="modal-close" onClick={() => setDeleteModal(null)} disabled={!!deletingId || isBulkDeleting}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="modal-body" style={{ padding: '1.25rem 1.5rem' }}>
+              {deleteModal.type === 'single' && deleteModal.targetSale ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ background: '#1f2937', padding: '0.85rem', borderRadius: '8px', border: '1px solid #374151', fontSize: '0.85rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                      <span style={{ color: '#9ca3af' }}>Invoice No:</span>
+                      <strong style={{ color: '#f9fafb' }}>{deleteModal.targetSale.invoiceNumber || deleteModal.targetSale._id.substring(0, 10)}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                      <span style={{ color: '#9ca3af' }}>Customer:</span>
+                      <span style={{ color: '#f9fafb', fontWeight: 600 }}>{deleteModal.targetSale.customerId?.name || 'Walk-in'}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                      <span style={{ color: '#9ca3af' }}>Amount:</span>
+                      <span style={{ color: '#10b981', fontWeight: 700 }}>₹{deleteModal.targetSale.totalAmount.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#9ca3af' }}>Items:</span>
+                      <span style={{ color: '#f9fafb' }}>{deleteModal.targetSale.items.length} product(s)</span>
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '0.65rem 0.85rem', borderRadius: '6px', fontSize: '0.8rem', color: '#fca5a5' }}>
+                    ✓ Inventory stock for all products in this invoice will be automatically restored back to stock.
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <p style={{ margin: 0, fontSize: '0.9rem', color: '#e5e7eb' }}>
+                    Are you sure you want to permanently delete <strong>{selectedIds.length}</strong> selected sale records?
+                  </p>
+                  <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '0.65rem 0.85rem', borderRadius: '6px', fontSize: '0.8rem', color: '#fca5a5' }}>
+                    ✓ All items across these selected invoices will be restored back into inventory stock.
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer" style={{ borderTop: '1px solid #1f2937', padding: '1rem 1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setDeleteModal(null)}
+                disabled={!!deletingId || isBulkDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={executeConfirmDelete}
+                disabled={!!deletingId || isBulkDeleting}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#dc2626' }}
+              >
+                {deletingId || isBulkDeleting ? (
+                  <>
+                    <div className="spinner" style={{ width: '14px', height: '14px', border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                    <span>Deleting & Restoring Stock...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={16} />
+                    <span>Confirm Delete</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

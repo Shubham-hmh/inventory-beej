@@ -8,7 +8,11 @@ import {
   Search, 
   X, 
   AlertCircle,
-  FolderOpen
+  FolderOpen,
+  Package,
+  CheckCircle,
+  TrendingUp,
+  Layers
 } from 'lucide-react';
 
 interface Item {
@@ -20,6 +24,17 @@ interface Item {
   unit: string;
   brand?: string;
   variety?: string;
+}
+
+function cleanUnitName(rawUnit?: string): string {
+  if (!rawUnit) return '';
+  return rawUnit.replace(/^\d+(\.\d+)?\s*/, '').trim();
+}
+
+function formatDisplayQty(quantity: number | string, rawUnit?: string): string {
+  const qty = Number(quantity) || 0;
+  const unitName = cleanUnitName(rawUnit);
+  return unitName ? `${qty} ${unitName}` : `${qty}`;
 }
 
 export default function Inventory() {
@@ -79,7 +94,7 @@ export default function Inventory() {
     setTimeout(() => {
       setError('');
       setSuccess('');
-    }, 4000);
+    }, 5000);
   };
 
   const handleAddItem = async (e: React.FormEvent) => {
@@ -105,7 +120,11 @@ export default function Inventory() {
       });
       const data = await res.json();
       if (data.success) {
-        setSuccess('Item successfully added to inventory!');
+        if (data.isMerged) {
+          setSuccess(data.message || `Existing product found! Stock combined into existing item without duplicate entry.`);
+        } else {
+          setSuccess('New product successfully cataloged!');
+        }
         setIsAddOpen(false);
         // Reset form
         setName('');
@@ -155,7 +174,7 @@ export default function Inventory() {
       });
       const data = await res.json();
       if (data.success) {
-        setSuccess('Item successfully updated!');
+        setSuccess('Item details updated successfully!');
         setIsEditOpen(false);
         setSelectedItem(null);
         setName('');
@@ -183,7 +202,7 @@ export default function Inventory() {
       });
       const data = await res.json();
       if (data.success) {
-        setSuccess('Item deleted successfully.');
+        setSuccess('Item removed successfully from inventory.');
         fetchItems();
       } else {
         setError(data.error || 'Failed to delete item');
@@ -197,6 +216,8 @@ export default function Inventory() {
   // Filter & Search logic
   const filteredItems = items.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase()) || 
+                          (item.brand && item.brand.toLowerCase().includes(search.toLowerCase())) ||
+                          (item.variety && item.variety.toLowerCase().includes(search.toLowerCase())) ||
                           item.category.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
     return matchesSearch && matchesCategory;
@@ -204,30 +225,53 @@ export default function Inventory() {
 
   const categoriesList = ['All', 'Seeds', 'Fertilizer', 'Pesticide', 'Tools', 'Other'];
 
+  const outOfStockCount = items.filter(i => i.stock <= 0).length;
+  const lowStockCount = items.filter(i => i.stock > 0 && i.stock < 10).length;
+
+  const selectStyle = {
+    backgroundColor: '#111827',
+    color: '#f3f4f6',
+    borderColor: 'rgba(255, 255, 255, 0.15)'
+  };
+  const optionStyle = {
+    backgroundColor: '#1f2937',
+    color: '#f9fafb',
+    padding: '8px'
+  };
+
   return (
     <div>
+      {/* Header Banner */}
       <div className="page-header">
         <div className="page-title-group">
-          <h1>Inventory Catalog</h1>
-          <p>Configure product pricing, details, and initial stock registry</p>
+          <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <Package size={26} style={{ color: '#a855f7' }} />
+            Inventory & Products Catalog
+          </h1>
+          <p>Product pricing, automatic duplicate consolidation, and stock tracking</p>
         </div>
         <button className="btn btn-primary" onClick={() => setIsAddOpen(true)}>
           <Plus size={18} />
-          <span>Add New Product</span>
+          <span>Add Product</span>
         </button>
       </div>
 
-      {success && <div className="alert alert-success">{success}</div>}
+      {success && (
+        <div className="alert alert-success" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <CheckCircle size={18} />
+          <span>{success}</span>
+        </div>
+      )}
       {error && <div className="alert alert-danger">{error}</div>}
 
       {/* Search & Category Filter bar */}
-      <div className="card" style={{ marginBottom: '2rem', padding: '1.25rem' }}>
+      <div className="card" style={{ marginBottom: '1.5rem', padding: '1.25rem' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ position: 'relative', flexGrow: 1, maxWidth: '400px' }}>
+          <div style={{ position: 'relative', flexGrow: 1, maxWidth: '420px' }}>
             <Search size={18} style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input 
               type="text" 
-              placeholder="Search items by name or category..." 
+              placeholder="Search by product name, brand, variety or category..." 
               className="form-control"
               style={{ paddingLeft: '2.5rem' }}
               value={search}
@@ -237,12 +281,12 @@ export default function Inventory() {
           
           <div className="flex-gap-2">
             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Category:</span>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
               {categoriesList.map(cat => (
                 <button
                   key={cat}
                   className={`btn ${selectedCategory === cat ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', fontWeight: 500 }}
+                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', fontWeight: 500 }}
                   onClick={() => setSelectedCategory(cat)}
                 >
                   {cat}
@@ -263,7 +307,7 @@ export default function Inventory() {
           <FolderOpen size={48} style={{ color: 'var(--text-muted)', marginBottom: '1rem' }} />
           <h3 style={{ fontSize: '1.2rem', fontWeight: 600, marginBottom: '0.5rem' }}>No Items Found</h3>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-            No products match your filters. Try adding a new product to begin tracking!
+            No products match your search. Click "Add Product" above to catalog new items!
           </p>
         </div>
       ) : (
@@ -275,26 +319,26 @@ export default function Inventory() {
                 <th>Brand</th>
                 <th>Variety</th>
                 <th>Category</th>
-                <th>Selling Price</th>
-                <th>Available Stock</th>
+                <th>Selling Rate</th>
+                <th>Current Stock</th>
                 <th className="text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredItems.map(item => (
                 <tr key={item._id}>
-                  <td style={{ fontWeight: 600 }}>{item.name}</td>
+                  <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{item.name}</td>
                   <td>{item.brand || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No Brand</span>}</td>
                   <td>{item.variety || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No Variety</span>}</td>
                   <td>
                     <span className="badge badge-info">{item.category}</span>
                   </td>
-                  <td style={{ fontWeight: 600 }}>
-                    ₹{item.price.toFixed(2)} <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 400 }}>per {item.unit}</span>
+                  <td style={{ fontWeight: 600, color: 'var(--primary)' }}>
+                    ₹{item.price.toFixed(2)} <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 400 }}>per {cleanUnitName(item.unit) || 'unit'}</span>
                   </td>
                   <td>
-                    <span className={`badge ${item.stock < 10 ? 'badge-danger' : 'badge-success'}`} style={{ fontWeight: 600 }}>
-                      {item.stock} {item.unit}
+                    <span className={`badge ${item.stock <= 0 ? 'badge-danger' : item.stock < 10 ? 'badge-warning' : 'badge-success'}`} style={{ fontWeight: 600 }}>
+                      {formatDisplayQty(item.stock, item.unit)}
                     </span>
                   </td>
                   <td className="text-right">
@@ -327,13 +371,27 @@ export default function Inventory() {
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
-              <h3 className="modal-title">Add New Product</h3>
+              <h3 className="modal-title">Add / Restock Product</h3>
               <button className="modal-close" onClick={() => setIsAddOpen(false)}>
                 <X size={20} />
               </button>
             </div>
             <form onSubmit={handleAddItem}>
               <div className="modal-body">
+                <div 
+                  style={{ 
+                    backgroundColor: 'rgba(16, 185, 129, 0.08)', 
+                    border: '1px solid rgba(16, 185, 129, 0.25)', 
+                    borderRadius: 'var(--radius-md)', 
+                    padding: '0.65rem 0.9rem', 
+                    marginBottom: '1rem',
+                    fontSize: '0.8rem',
+                    color: 'var(--primary)'
+                  }}
+                >
+                  ⚡ <strong>Auto-Consolidation:</strong> If an item with the same Product Name, Brand, & Variety exists, stock will be automatically added into the existing product without duplicate entries.
+                </div>
+
                 <div className="form-group">
                   <label className="form-label">Product Name *</label>
                   <input 
@@ -374,14 +432,15 @@ export default function Inventory() {
                     <label className="form-label">Category *</label>
                     <select 
                       className="form-control"
+                      style={selectStyle}
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
                     >
-                      <option value="Seeds">Seeds</option>
-                      <option value="Fertilizer">Fertilizer</option>
-                      <option value="Pesticide">Pesticide</option>
-                      <option value="Tools">Tools</option>
-                      <option value="Other">Other</option>
+                      <option value="Seeds" style={optionStyle}>Seeds</option>
+                      <option value="Fertilizer" style={optionStyle}>Fertilizer</option>
+                      <option value="Pesticide" style={optionStyle}>Pesticide</option>
+                      <option value="Tools" style={optionStyle}>Tools</option>
+                      <option value="Other" style={optionStyle}>Other</option>
                     </select>
                   </div>
                   <div className="form-group">
@@ -487,14 +546,15 @@ export default function Inventory() {
                     <label className="form-label">Category *</label>
                     <select 
                       className="form-control"
+                      style={selectStyle}
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
                     >
-                      <option value="Seeds">Seeds</option>
-                      <option value="Fertilizer">Fertilizer</option>
-                      <option value="Pesticide">Pesticide</option>
-                      <option value="Tools">Tools</option>
-                      <option value="Other">Other</option>
+                      <option value="Seeds" style={optionStyle}>Seeds</option>
+                      <option value="Fertilizer" style={optionStyle}>Fertilizer</option>
+                      <option value="Pesticide" style={optionStyle}>Pesticide</option>
+                      <option value="Tools" style={optionStyle}>Tools</option>
+                      <option value="Other" style={optionStyle}>Other</option>
                     </select>
                   </div>
                   <div className="form-group">
@@ -522,7 +582,7 @@ export default function Inventory() {
                 </div>
                 <div className="alert alert-success" style={{ padding: '0.75rem', fontSize: '0.8rem', margin: 0 }}>
                   <AlertCircle size={16} />
-                  <span>Stock levels are modified only through Stock Inward and Sales billing.</span>
+                  <span>Stock levels are modified through Stock Inward and Sales billing.</span>
                 </div>
               </div>
               <div className="modal-footer">
@@ -547,3 +607,4 @@ export default function Inventory() {
     </div>
   );
 }
+

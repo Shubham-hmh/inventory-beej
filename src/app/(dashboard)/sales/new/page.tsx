@@ -13,7 +13,12 @@ import {
   CreditCard,
   Plus,
   FileText,
-  UserCheck
+  UserCheck,
+  Search,
+  Sparkles,
+  DollarSign,
+  Package,
+  Receipt
 } from 'lucide-react';
 
 interface Item {
@@ -266,6 +271,29 @@ export default function NewSale() {
     setExistingInvoice(null);
   };
 
+  // Direct item selection helper
+  const handleDirectItemSelect = (itemId: string) => {
+    if (!itemId) {
+      setSelectedItemId('');
+      setSelectedProductName('');
+      setSelectedBrand('');
+      setSelectedVariety('');
+      setSalePrice('');
+      setSaleQty('');
+      return;
+    }
+
+    const match = items.find(it => it._id === itemId);
+    if (match) {
+      setSelectedItemId(match._id);
+      setSelectedProductName(match.name);
+      setSelectedBrand(match.brand || 'No Brand');
+      setSelectedVariety(match.variety || 'No Variety');
+      setSalePrice(match.price.toString());
+      setSaleQty('1');
+    }
+  };
+
   // Automatically resolve selectedItemId based on cascading dropdowns
   useEffect(() => {
     if (selectedProductName && selectedBrand && selectedVariety) {
@@ -276,29 +304,16 @@ export default function NewSale() {
       );
       if (match) {
         setSelectedItemId(match._id);
+        setSalePrice(match.price.toString());
+        if (!saleQty) setSaleQty('1');
         return;
       }
     }
-    setSelectedItemId('');
   }, [selectedProductName, selectedBrand, selectedVariety, items]);
-
-  // Handle selected item price fill
-  useEffect(() => {
-    if (selectedItemId) {
-      const match = items.find(it => it._id === selectedItemId);
-      if (match) {
-        setSalePrice(match.price.toString());
-        setSaleQty('1');
-      }
-    } else {
-      setSalePrice('');
-      setSaleQty('');
-    }
-  }, [selectedItemId, items]);
 
   const handleAddToInvoice = () => {
     if (!selectedItemId || !saleQty || !salePrice) {
-      setError('Please select an item, quantity, and specify the selling price.');
+      setError('Please select a product, quantity, and unit price.');
       return;
     }
 
@@ -355,8 +370,6 @@ export default function NewSale() {
   const discountVal = Math.max(0, Number(billDiscount) || 0);
   const totalInvoiceVal = Math.max(0, subtotalVal - discountVal);
 
-  const calculateTotal = () => totalInvoiceVal;
-
   const handleSubmitInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customerName) {
@@ -368,7 +381,7 @@ export default function NewSale() {
       return;
     }
     if (cart.length === 0) {
-      setError('Invoice must contain at least one product.');
+      setError('Invoice must contain at least one product in the cart.');
       return;
     }
 
@@ -485,12 +498,28 @@ export default function NewSale() {
 
   const activeItem = items.find(it => it._id === selectedItemId);
 
+  // Common dark select option styling for crisp text contrast across all browsers
+  const selectStyle = {
+    backgroundColor: '#111827',
+    color: '#f3f4f6',
+    borderColor: 'rgba(255, 255, 255, 0.15)'
+  };
+  const optionStyle = {
+    backgroundColor: '#1f2937',
+    color: '#f9fafb',
+    padding: '8px'
+  };
+
   return (
     <div>
+      {/* Page Header */}
       <div className="page-header">
         <div className="page-title-group">
-          <h1>New Sale / Billing POS</h1>
-          <p>Register customer invoices, collect payments, and automatically reconcile stock levels</p>
+          <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <ShoppingBag size={26} style={{ color: 'var(--primary)' }} />
+            New Sale / POS Counter
+          </h1>
+          <p>Create bills, apply item/bill discounts, auto-link customer history & issue receipts</p>
         </div>
       </div>
 
@@ -498,25 +527,33 @@ export default function NewSale() {
       {error && <div className="alert alert-danger">{error}</div>}
 
       <div className="grid-split-pos">
-        {/* Left Side: Customer & Item input */}
+        {/* Left Side: Customer Info & Product Selector */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           
-          {/* Customer registry */}
+          {/* Customer Card */}
           <div className="card">
-            <div className="flex-gap-3" style={{ marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-              <UserPlus size={20} className="text-primary" />
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Buyer Information</h3>
+            <div className="flex-between" style={{ marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.6rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <UserPlus size={20} style={{ color: 'var(--primary)' }} />
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>1. Buyer Information</h3>
+              </div>
+              {detectedCustomer && !isNewCustomer && (
+                <span className="badge badge-success" style={{ fontSize: '0.75rem' }}>
+                  ✓ Existing Customer
+                </span>
+              )}
             </div>
 
-            {/* Quick Customer Picker */}
+            {/* Quick Customer Dropdown */}
             {!isNewCustomer && customers.length > 0 && (
               <div className="form-group" style={{ marginBottom: '1.25rem' }}>
                 <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>Quick Select Existing Customer</span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>({customers.length} registered)</span>
+                  <span>Quick Select Registered Customer</span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>({customers.length} in database)</span>
                 </label>
                 <select
                   className="form-control"
+                  style={selectStyle}
                   value={detectedCustomer?._id || ''}
                   onChange={(e) => {
                     const selectedId = e.target.value;
@@ -526,28 +563,25 @@ export default function NewSale() {
                       return;
                     }
                     const cust = customers.find(c => c._id === selectedId);
-                    if (cust) {
-                      selectCustomer(cust);
-                    }
+                    if (cust) selectCustomer(cust);
                   }}
-                  style={{ borderColor: detectedCustomer ? 'var(--primary)' : undefined }}
                 >
-                  <option value="">-- Choose Existing Customer (or type below) --</option>
+                  <option value="" style={optionStyle}>-- Pick Existing Customer (or type below) --</option>
                   {customers.map(c => (
-                    <option key={c._id} value={c._id}>
-                      {c.name} — Phone: {c.phone}{c.address ? ` (${c.address})` : ''}
+                    <option key={c._id} value={c._id} style={optionStyle}>
+                      {c.name} — Phone: {c.phone} {c.address ? `(${c.address})` : ''}
                     </option>
                   ))}
                 </select>
               </div>
             )}
 
-            {/* Customer Name with Autocomplete & Datalist */}
+            {/* Customer Name input with autosearch */}
             <div className="form-group" style={{ position: 'relative' }} ref={suggestionRef}>
               <label className="form-label">Customer Name *</label>
               <input 
                 type="text" 
-                placeholder="Type customer name (e.g. Ramesh Singh)" 
+                placeholder="Type name (e.g. Ramesh Kumar)" 
                 className="form-control"
                 required
                 list="existing-customers-datalist"
@@ -577,40 +611,39 @@ export default function NewSale() {
                     top: '100%',
                     left: 0,
                     right: 0,
-                    zIndex: 20,
-                    backgroundColor: 'var(--bg-secondary)',
-                    border: '1px solid var(--border-hover)',
+                    zIndex: 30,
+                    backgroundColor: '#1f2937',
+                    border: '1px solid var(--primary)',
                     borderRadius: 'var(--radius-md)',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-                    maxHeight: '200px',
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.6)',
+                    maxHeight: '220px',
                     overflowY: 'auto',
                     marginTop: '4px'
                   }}
                 >
                   <div style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>
-                    Matching Existing Customers:
+                    Matching Customers:
                   </div>
                   {nameSuggestions.map((cust) => (
                     <div
                       key={cust._id}
                       onClick={() => selectCustomer(cust)}
                       style={{
-                        padding: '0.6rem 0.85rem',
+                        padding: '0.65rem 0.85rem',
                         cursor: 'pointer',
-                        borderBottom: '1px solid rgba(255,255,255,0.03)',
+                        borderBottom: '1px solid rgba(255,255,255,0.05)',
                         display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        transition: 'background 0.15s ease'
+                        justify: 'space-between',
+                        alignItems: 'center'
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)')}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)')}
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
                       <div>
-                        <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#f9fafb' }}>
                           {cust.name}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
                           Phone: {cust.phone} {cust.address ? `• ${cust.address}` : ''}
                         </div>
                       </div>
@@ -623,7 +656,7 @@ export default function NewSale() {
               )}
             </div>
 
-            {/* Checkbox: Create as New Customer */}
+            {/* Checkbox: New Customer */}
             <div style={{ margin: '0.5rem 0 1rem 0' }}>
               <label 
                 htmlFor="isNewCustomerCheckbox" 
@@ -633,7 +666,7 @@ export default function NewSale() {
                   gap: '0.5rem', 
                   cursor: 'pointer',
                   userSelect: 'none',
-                  fontSize: '0.875rem',
+                  fontSize: '0.85rem',
                   fontWeight: 500,
                   color: isNewCustomer ? 'var(--accent)' : 'var(--text-secondary)'
                 }}
@@ -649,17 +682,15 @@ export default function NewSale() {
                       setDetectedCustomer(null);
                       setExistingInvoice(null);
                       setShowSuggestions(false);
-                      // Clear phone if it was auto-filled from an existing customer
                       setCustomerPhone('');
                       setCustomerAddress('');
                     } else {
-                      // Re-check detection with current name
                       handleNameChange(customerName);
                     }
                   }}
                   style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--primary)' }}
                 />
-                <span>Create as new customer (if same name exists already)</span>
+                <span>Register as a new customer profile (if same name exists)</span>
               </label>
             </div>
 
@@ -667,8 +698,8 @@ export default function NewSale() {
             {detectedCustomer && !isNewCustomer && (
               <div 
                 style={{ 
-                  backgroundColor: 'rgba(16, 185, 129, 0.1)', 
-                  border: '1px solid rgba(16, 185, 129, 0.3)', 
+                  backgroundColor: 'rgba(16, 185, 129, 0.12)', 
+                  border: '1px solid rgba(16, 185, 129, 0.35)', 
                   borderRadius: 'var(--radius-md)', 
                   padding: '0.75rem 1rem', 
                   marginBottom: '1.25rem' 
@@ -676,143 +707,168 @@ export default function NewSale() {
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary)', fontWeight: 600, fontSize: '0.9rem' }}>
                   <UserCheck size={18} />
-                  <span>Existing Customer Linked: {detectedCustomer.name}</span>
+                  <span>Linked Customer: {detectedCustomer.name}</span>
                 </div>
-                
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.35rem' }}>
                   {existingInvoice ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-primary)' }}>
                       <FileText size={14} className="text-primary" />
                       <span>
-                        Existing Invoice <strong>#{existingInvoice.invoiceNumber}</strong> detected. New items will be automatically appended into this existing record.
+                        Existing invoice <strong>#{existingInvoice.invoiceNumber}</strong> found. New items will be automatically appended.
                       </span>
                     </div>
                   ) : (
-                    <span>Customer profile linked. A new initial invoice will be created for this customer.</span>
+                    <span>Customer profile linked. A new invoice will be generated.</span>
                   )}
                 </div>
               </div>
             )}
 
-            {/* New Customer Flag Banner */}
-            {isNewCustomer && (
-              <div 
-                style={{ 
-                  backgroundColor: 'rgba(245, 158, 11, 0.1)', 
-                  border: '1px solid rgba(245, 158, 11, 0.25)', 
-                  borderRadius: 'var(--radius-md)', 
-                  padding: '0.6rem 0.9rem', 
-                  marginBottom: '1.25rem' 
-                }}
-              >
-                <span style={{ fontSize: '0.8rem', color: 'var(--accent)', fontWeight: 500 }}>
-                  Treating as a separate new customer profile. Please enter their unique phone number. A new invoice ID will be generated.
-                </span>
+            {/* Phone & Address Inputs */}
+            <div className="grid-2col">
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Phone Number *</label>
+                <input 
+                  type="tel"
+                  placeholder="10 digit phone"
+                  maxLength={12}
+                  className="form-control"
+                  required
+                  value={customerPhone}
+                  onChange={(e) => handlePhoneChange(e.target.value)}
+                />
               </div>
-            )}
 
-            {/* Phone Number */}
-            <div className="form-group">
-              <label className="form-label">Phone Number *</label>
-              <input 
-                type="tel"
-                placeholder="Type phone (10 digits)"
-                maxLength={12}
-                className="form-control"
-                required
-                value={customerPhone}
-                onChange={(e) => handlePhoneChange(e.target.value)}
-              />
-            </div>
-
-            {/* Address */}
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Address (Optional)</label>
-              <input 
-                type="text" 
-                placeholder="Village / Town name" 
-                className="form-control"
-                value={customerAddress}
-                onChange={(e) => setCustomerAddress(e.target.value)}
-              />
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Address (Optional)</label>
+                <input 
+                  type="text" 
+                  placeholder="Village / Town" 
+                  className="form-control"
+                  value={customerAddress}
+                  onChange={(e) => setCustomerAddress(e.target.value)}
+                />
+              </div>
             </div>
           </div>
 
-          {/* Add Cart Item */}
+          {/* Product Selector Card */}
           <div className="card">
-            <div className="flex-gap-3" style={{ marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-              <ShoppingBag size={20} className="text-primary" />
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Select Product</h3>
+            <div className="flex-between" style={{ marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.6rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Package size={20} style={{ color: '#a855f7' }} />
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>2. Select Products</h3>
+              </div>
+              <span className="badge" style={{ backgroundColor: 'rgba(168, 85, 247, 0.1)', color: '#a855f7' }}>
+                {items.length} Items Available
+              </span>
             </div>
 
-            {/* Product selection */}
-            <div className="form-group">
-              <label className="form-label">Select Product *</label>
+            {/* Direct 1-Click Product Selector Dropdown */}
+            <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+              <label className="form-label" style={{ fontWeight: 600, color: '#f3f4f6' }}>
+                ⚡ Instant Product & Variety Dropdown (1-Click Selection)
+              </label>
               <select
                 className="form-control"
+                style={selectStyle}
+                value={selectedItemId}
+                onChange={(e) => handleDirectItemSelect(e.target.value)}
+              >
+                <option value="" style={optionStyle}>-- Direct Search & Choose Item --</option>
+                {items.map(it => (
+                  <option key={it._id} value={it._id} style={optionStyle}>
+                    {it.name} {it.brand ? `[${it.brand}]` : ''} {it.variety ? `(${it.variety})` : ''} — ₹{it.price}/{cleanUnitName(it.unit) || 'unit'} (Stock: {it.stock} {cleanUnitName(it.unit)})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ textTransform: 'uppercase', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: '0.75rem', textAlign: 'center' }}>
+              — OR FILTER BY CATEGORY / BRAND —
+            </div>
+
+            {/* Cascading Filter Selection */}
+            <div className="form-group">
+              <label className="form-label">Product Name</label>
+              <select
+                className="form-control"
+                style={selectStyle}
                 value={selectedProductName}
                 onChange={(e) => {
                   setSelectedProductName(e.target.value);
                   setSelectedBrand('');
                   setSelectedVariety('');
+                  setSelectedItemId('');
                 }}
               >
-                <option value="">-- Choose Product --</option>
+                <option value="" style={optionStyle}>-- Choose Product Name --</option>
                 {distinctProductNames.map(name => (
-                  <option key={name} value={name}>{name}</option>
+                  <option key={name} value={name} style={optionStyle}>{name}</option>
                 ))}
               </select>
             </div>
 
-            {/* Brand & Variety */}
             {selectedProductName && (
-              <div className="grid-2col">
-                <div className="form-group">
+              <div className="grid-2col" style={{ marginBottom: '1.25rem' }}>
+                <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label">Brand</label>
                   <select
                     className="form-control"
+                    style={selectStyle}
                     value={selectedBrand}
                     onChange={(e) => {
                       setSelectedBrand(e.target.value);
                       setSelectedVariety('');
+                      setSelectedItemId('');
                     }}
                   >
-                    <option value="">-- Select Brand --</option>
+                    <option value="" style={optionStyle}>-- Choose Brand --</option>
                     {availableBrands.map(b => (
-                      <option key={b} value={b}>{b}</option>
+                      <option key={b} value={b} style={optionStyle}>{b}</option>
                     ))}
                   </select>
                 </div>
 
-                <div className="form-group">
+                <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label">Variety</label>
                   <select
                     className="form-control"
+                    style={selectStyle}
                     value={selectedVariety}
                     disabled={!selectedBrand}
                     onChange={(e) => setSelectedVariety(e.target.value)}
                   >
-                    <option value="">-- Select Variety --</option>
+                    <option value="" style={optionStyle}>-- Choose Variety --</option>
                     {availableVarieties.map(v => (
-                      <option key={v} value={v}>{v}</option>
+                      <option key={v} value={v} style={optionStyle}>{v}</option>
                     ))}
                   </select>
                 </div>
               </div>
             )}
 
-            {/* Quantity and Price */}
+            {/* Quantity, Unit Price, Item Discount Input */}
             {activeItem && (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', fontSize: '0.85rem' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Available Stock:</span>
+              <div style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                padding: '1.25rem',
+                marginTop: '1rem'
+              }}>
+                <div className="flex-between" style={{ marginBottom: '1rem' }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+                    Selected: <span style={{ color: 'var(--primary)' }}>{activeItem.name}</span>
+                    {activeItem.variety ? ` (${activeItem.variety})` : ''}
+                  </div>
                   <span className={`badge ${activeItem.stock > 10 ? 'badge-success' : 'badge-danger'}`}>
-                    {activeItem.stock} {cleanUnitName(activeItem.unit) || 'units'} in stock
+                    Available Stock: {activeItem.stock} {cleanUnitName(activeItem.unit) || 'units'}
                   </span>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
-                  <div className="form-group">
+                  <div className="form-group" style={{ margin: 0 }}>
                     <label className="form-label">
                       Quantity {cleanUnitName(activeItem.unit) ? `(${cleanUnitName(activeItem.unit)})` : ''} *
                     </label>
@@ -826,7 +882,7 @@ export default function NewSale() {
                     />
                   </div>
 
-                  <div className="form-group">
+                  <div className="form-group" style={{ margin: 0 }}>
                     <label className="form-label">Price / Unit (₹) *</label>
                     <input 
                       type="number" 
@@ -838,7 +894,7 @@ export default function NewSale() {
                     />
                   </div>
 
-                  <div className="form-group">
+                  <div className="form-group" style={{ margin: 0 }}>
                     <label className="form-label">Item Discount (₹)</label>
                     <input 
                       type="number" 
@@ -853,45 +909,48 @@ export default function NewSale() {
                 </div>
 
                 {itemDiscount && Number(itemDiscount) > 0 && (
-                  <div style={{ fontSize: '0.8rem', color: 'var(--success)', marginBottom: '0.5rem', fontWeight: 500 }}>
-                    ✓ Net Unit Price: ₹{Math.max(0, Number(salePrice || 0) - Number(itemDiscount))} / {cleanUnitName(activeItem.unit) || 'unit'} (₹{itemDiscount} off)
+                  <div style={{ fontSize: '0.8rem', color: 'var(--success)', marginTop: '0.75rem', fontWeight: 600 }}>
+                    ✓ Net Unit Rate: ₹{Math.max(0, Number(salePrice || 0) - Number(itemDiscount))} / {cleanUnitName(activeItem.unit) || 'unit'} (Discount: ₹{itemDiscount})
                   </div>
                 )}
 
                 <button 
                   type="button" 
-                  className="btn btn-secondary" 
-                  style={{ width: '100%', marginTop: '0.5rem' }}
+                  className="btn btn-primary" 
+                  style={{ width: '100%', marginTop: '1.25rem', padding: '0.85rem' }}
                   onClick={handleAddToInvoice}
                 >
-                  <Plus size={16} />
-                  <span>Add Product to Bill</span>
+                  <Plus size={18} />
+                  <span>Add Product to Cart</span>
                 </button>
               </div>
             )}
           </div>
         </div>
 
-        {/* Right Side: Cart Summary & Bill Finalization */}
+        {/* Right Side: Billing Cart & Final Checkout */}
         <div>
           <div className="card">
             <div className="flex-between" style={{ marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Billing Cart</h3>
-                {existingInvoice && !isNewCustomer && (
-                  <span className="badge badge-info" style={{ fontSize: '0.7rem' }}>
-                    Appending to #{existingInvoice.invoiceNumber}
-                  </span>
-                )}
+                <Receipt size={22} style={{ color: 'var(--primary)' }} />
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>3. Billing Summary</h3>
               </div>
-              <span className="badge badge-primary">{cart.length} items</span>
+              {existingInvoice && !isNewCustomer ? (
+                <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>
+                  Appending to #{existingInvoice.invoiceNumber}
+                </span>
+              ) : (
+                <span className="badge badge-primary">{cart.length} items</span>
+              )}
             </div>
 
-            {/* Cart Table */}
+            {/* Cart Items Table */}
             {cart.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
-                <ShoppingBag size={40} style={{ margin: '0 auto 0.75rem auto', opacity: 0.4 }} />
-                <p style={{ fontSize: '0.9rem' }}>No products added yet. Pick from left panel.</p>
+              <div style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--text-muted)' }}>
+                <ShoppingBag size={48} style={{ margin: '0 auto 0.75rem auto', opacity: 0.3 }} />
+                <p style={{ fontSize: '0.95rem', fontWeight: 500 }}>Your cart is empty.</p>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Select products from the left panel to begin billing.</p>
               </div>
             ) : (
               <div className="table-container" style={{ margin: '0 0 1.5rem 0', border: 'none', backgroundColor: 'transparent' }}>
@@ -918,7 +977,7 @@ export default function NewSale() {
                         </td>
                         <td>{formatDisplayQty(cItem.quantity, cItem.unit)}</td>
                         <td>₹{cItem.price}</td>
-                        <td className="text-right" style={{ fontWeight: 600, color: 'var(--primary)' }}>
+                        <td className="text-right" style={{ fontWeight: 700, color: 'var(--primary)' }}>
                           ₹{(cItem.quantity * cItem.price).toLocaleString('en-IN')}
                         </td>
                         <td className="text-right">
@@ -926,6 +985,7 @@ export default function NewSale() {
                             className="btn btn-danger btn-icon" 
                             onClick={() => handleRemoveFromCart(idx)}
                             title="Remove item"
+                            style={{ padding: '0.35rem 0.5rem' }}
                           >
                             <Trash2 size={14} />
                           </button>
@@ -937,21 +997,35 @@ export default function NewSale() {
               </div>
             )}
 
-            {/* Sale metadata */}
-            <div className="grid-2col" style={{ marginBottom: '1.5rem' }}>
-              <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Payment Mode</label>
-                <select 
-                  className="form-control"
-                  value={paymentMode}
-                  onChange={(e: any) => setPaymentMode(e.target.value)}
-                >
-                  <option value="Cash">Cash</option>
-                  <option value="UPI">UPI / Online</option>
-                  <option value="Credit">Credit (Udhaar)</option>
-                </select>
+            {/* Payment Mode Selector Buttons */}
+            <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+              <label className="form-label">Payment Method *</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
+                {(['Cash', 'UPI', 'Credit'] as const).map(mode => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setPaymentMode(mode)}
+                    style={{
+                      padding: '0.65rem',
+                      borderRadius: 'var(--radius-md)',
+                      border: paymentMode === mode ? '2px solid var(--primary)' : '1px solid var(--border-color)',
+                      backgroundColor: paymentMode === mode ? 'var(--primary-glow)' : 'rgba(255, 255, 255, 0.03)',
+                      color: paymentMode === mode ? 'var(--primary)' : 'var(--text-secondary)',
+                      fontWeight: 600,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    {mode === 'Credit' ? 'Credit (Udhaar)' : mode === 'UPI' ? 'UPI / Online' : 'Cash'}
+                  </button>
+                ))}
               </div>
+            </div>
 
+            {/* Sale Date & Notes */}
+            <div className="grid-2col" style={{ marginBottom: '1.25rem' }}>
               <div className="form-group" style={{ margin: 0 }}>
                 <label className="form-label">Sale Date</label>
                 <input 
@@ -961,26 +1035,26 @@ export default function NewSale() {
                   onChange={(e) => setSaleDate(e.target.value)}
                 />
               </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Remarks / Notes</label>
+                <input 
+                  type="text"
+                  placeholder="e.g. Due date or promo"
+                  className="form-control"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+              </div>
             </div>
 
+            {/* Bill Level Discount */}
             <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-              <label className="form-label">Notes / Remarks (Optional)</label>
-              <input 
-                type="text"
-                placeholder="e.g. Due next month, or discount notes"
-                className="form-control"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-            </div>
-
-            {/* Bill-level Discount */}
-            <div className="form-group" style={{ marginBottom: '1.25rem' }}>
               <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Bill Discount (₹)</span>
+                <span>Overall Bill Discount (₹)</span>
                 {discountVal > 0 && (
                   <span style={{ color: 'var(--success)', fontSize: '0.8rem', fontWeight: 600 }}>
-                    -₹{discountVal.toLocaleString('en-IN')} off total
+                    -₹{discountVal.toLocaleString('en-IN')} off bill
                   </span>
                 )}
               </label>
@@ -988,41 +1062,57 @@ export default function NewSale() {
                 type="number"
                 step="any"
                 min="0"
-                placeholder="Enter overall discount in ₹ (optional)"
+                placeholder="Enter discount in ₹ (optional)"
                 className="form-control"
                 value={billDiscount}
                 onChange={(e) => setBillDiscount(e.target.value)}
               />
             </div>
 
-            <div className="flex-between" style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
-              <div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  {discountVal > 0 ? (
-                    <span>Subtotal: ₹{subtotalVal.toLocaleString('en-IN')} | Discount: -₹{discountVal.toLocaleString('en-IN')}</span>
-                  ) : (
-                    <span>{existingInvoice && !isNewCustomer ? 'New Items Total' : 'Grand Total Amount'}</span>
-                  )}
+            {/* Grand Total Box & Checkout Button */}
+            <div style={{
+              backgroundColor: 'rgba(16, 185, 129, 0.06)',
+              padding: '1.25rem',
+              borderRadius: 'var(--radius-lg)',
+              border: '1px solid rgba(16, 185, 129, 0.2)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem'
+            }}>
+              <div className="flex-between">
+                <div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    {discountVal > 0 ? (
+                      <span>Subtotal: ₹{subtotalVal.toLocaleString('en-IN')} | Discount: -₹{discountVal.toLocaleString('en-IN')}</span>
+                    ) : (
+                      <span>Net Payable Amount</span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--primary)', letterSpacing: '-0.02em' }}>
+                    ₹{totalInvoiceVal.toLocaleString('en-IN')}
+                  </div>
                 </div>
-                <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--primary)' }}>
-                  ₹{totalInvoiceVal.toLocaleString('en-IN')}
+
+                <div style={{ textAlign: 'right', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  <div>Items in Cart: {cart.length}</div>
+                  <div>Payment: {paymentMode}</div>
                 </div>
               </div>
-              
+
               <button 
                 type="button" 
                 className="btn btn-primary"
-                style={{ padding: '1rem 2rem' }}
+                style={{ width: '100%', padding: '1rem', fontSize: '1.05rem', fontWeight: 700 }}
                 disabled={submitting || cart.length === 0}
                 onClick={handleSubmitInvoice}
               >
-                <CreditCard size={18} />
+                <CreditCard size={20} />
                 <span>
                   {submitting 
-                    ? 'Saving...' 
+                    ? 'Processing Invoice...' 
                     : existingInvoice && !isNewCustomer 
-                      ? 'Append to Existing Invoice' 
-                      : 'Check Out / Save'}
+                      ? 'Append Items to Existing Invoice' 
+                      : 'Complete Sale & Issue Bill'}
                 </span>
               </button>
             </div>
@@ -1165,3 +1255,4 @@ export default function NewSale() {
     </div>
   );
 }
+

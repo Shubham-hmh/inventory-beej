@@ -8,10 +8,11 @@ import {
   Package, 
   Users, 
   ArrowDownLeft, 
-  ArrowUpRight, 
-  AlertTriangle,
-  ShoppingBag,
-  Download
+  ShoppingBag, 
+  Receipt,
+  ChevronRight,
+  PlusCircle,
+  AlertTriangle
 } from 'lucide-react';
 
 interface Item {
@@ -28,17 +29,17 @@ interface Sale {
   customerId: {
     name: string;
     phone: string;
-  };
+  } | null;
   items: Array<{
     itemId: {
       name: string;
       unit: string;
-    };
+    } | null;
     quantity: number;
     price: number;
   }>;
   totalAmount: number;
-  paymentMode: string;
+  paymentMode?: string;
   date: string;
   invoiceSequence?: number;
   invoiceNumber?: string;
@@ -49,11 +50,23 @@ interface StockInput {
   itemId: {
     name: string;
     unit: string;
-  };
+  } | null;
   quantity: number;
   unitPrice: number;
   date: string;
   supplier: string;
+}
+
+// Helpers for clean unit & quantity display
+function cleanUnitName(rawUnit?: string): string {
+  if (!rawUnit) return '';
+  return rawUnit.replace(/^\d+(\.\d+)?\s*/, '').trim();
+}
+
+function formatDisplayQty(quantity: number | string, rawUnit?: string): string {
+  const qty = Number(quantity) || 0;
+  const unitName = cleanUnitName(rawUnit);
+  return unitName ? `${qty} ${unitName}` : `${qty}`;
 }
 
 export default function Dashboard() {
@@ -82,20 +95,17 @@ export default function Dashboard() {
           return;
         }
 
-        // Fetch Items
-        const resItems = await fetch('/api/items');
-        const dataItems = await resItems.json();
-        
-        // Fetch Sales
-        const resSales = await fetch('/api/sales');
-        const dataSales = await resSales.json();
-        
-        // Fetch Stock Logs
-        const resStock = await fetch('/api/stock');
-        const dataStock = await resStock.json();
+        // Fetch Items, Sales, Stock, Customers in parallel
+        const [resItems, resSales, resStock, resCust] = await Promise.all([
+          fetch('/api/items'),
+          fetch('/api/sales'),
+          fetch('/api/stock'),
+          fetch('/api/customers')
+        ]);
 
-        // Fetch Customers
-        const resCust = await fetch('/api/customers');
+        const dataItems = await resItems.json();
+        const dataSales = await resSales.json();
+        const dataStock = await resStock.json();
         const dataCust = await resCust.json();
 
         if (dataItems.success) setItems(dataItems.data || []);
@@ -104,21 +114,21 @@ export default function Dashboard() {
         if (dataCust.success) setCustomersCount((dataCust.data || []).length);
 
       } catch (err: any) {
-        setError('Failed to fetch dashboard data. Please try again.');
+        setError('Failed to fetch dashboard data. Please refresh.');
         console.error(err);
       } finally {
         setLoading(false);
       }
     }
     fetchData();
-  }, []);
+  }, [router]);
 
   // Compute stats
-  const totalRevenue = sales.reduce((acc, curr) => acc + curr.totalAmount, 0);
-  const lowStockItems = items.filter(item => item.stock < 10);
+  const totalRevenue = sales.reduce((acc, curr) => acc + (curr.totalAmount || 0), 0);
+  const totalInvoices = sales.length;
   const totalItemsCount = items.length;
-  const recentSales = sales.slice(0, 5);
-  const recentStocks = stockLogs.slice(0, 5);
+  const recentSales = sales.slice(0, 6);
+  const recentStocks = stockLogs.slice(0, 6);
 
   if (loading) {
     return (
@@ -148,199 +158,278 @@ export default function Dashboard() {
 
   return (
     <div>
+      {/* Header Banner */}
       <div className="page-header">
         <div className="page-title-group">
           <h1>Dashboard Overview</h1>
-          <p>Kisan Beej Bhandar business performance and stock metrics</p>
+          <p>Kisan Beej Bhandar performance summary and sales activity</p>
         </div>
         <div className="flex-gap-3">
           <Link href="/sales/new" className="btn btn-primary">
-            <ShoppingBag size={18} />
-            <span>New Sale</span>
+            <PlusCircle size={18} />
+            <span>Create New Sale</span>
           </Link>
-          <Link href="/stock" className="btn btn-secondary">
-            <Download size={18} />
-            <span>Record Stock Inward</span>
+          <Link href="/customers" className="btn btn-secondary">
+            <Users size={18} />
+            <span>Customers Directory</span>
           </Link>
         </div>
       </div>
 
-      {/* Overview stats cards */}
+      {/* Overview Metric Cards */}
       <div className="dashboard-grid">
-        <div className="card">
-          <div className="card-header-flex">
-            <div>
-              <div className="card-value">₹{totalRevenue.toLocaleString('en-IN')}</div>
-              <div className="card-title">Total Sales Revenue</div>
+        <Link href="/sales" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <div className="card" style={{ height: '100%', cursor: 'pointer' }}>
+            <div className="card-header-flex">
+              <div>
+                <div className="card-value" style={{ color: 'var(--primary)' }}>
+                  ₹{totalRevenue.toLocaleString('en-IN')}
+                </div>
+                <div className="card-title">Total Sales Revenue</div>
+              </div>
+              <div className="card-icon-wrapper primary">
+                <TrendingUp size={24} />
+              </div>
             </div>
-            <div className="card-icon-wrapper primary">
-              <TrendingUp size={24} />
+            <div className="card-desc flex-between" style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
+              <span>Accrued across {totalInvoices} sales</span>
+              <span style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.2rem', fontWeight: 600, fontSize: '0.75rem' }}>
+                View History <ChevronRight size={14} />
+              </span>
             </div>
           </div>
-          <div className="card-desc">Accrued across {sales.length} transactions</div>
-        </div>
+        </Link>
 
-        <div className="card">
-          <div className="card-header-flex">
-            <div>
-              <div className="card-value">{totalItemsCount}</div>
-              <div className="card-title">Active Items</div>
+        <Link href="/customers" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <div className="card" style={{ height: '100%', cursor: 'pointer' }}>
+            <div className="card-header-flex">
+              <div>
+                <div className="card-value" style={{ color: '#38bdf8' }}>
+                  {customersCount}
+                </div>
+                <div className="card-title">Registered Customers</div>
+              </div>
+              <div className="card-icon-wrapper" style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8' }}>
+                <Users size={24} />
+              </div>
             </div>
-            <div className="card-icon-wrapper secondary">
-              <Package size={24} />
+            <div className="card-desc flex-between" style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
+              <span>Farmer database</span>
+              <span style={{ color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.2rem', fontWeight: 600, fontSize: '0.75rem' }}>
+                View Directory <ChevronRight size={14} />
+              </span>
             </div>
           </div>
-          <div className="card-desc">Seeds, fertilizers, and pesticides cataloged</div>
-        </div>
+        </Link>
 
-        <div className="card">
-          <div className="card-header-flex">
-            <div>
-              <div className="card-value">{customersCount}</div>
-              <div className="card-title">Registered Customers</div>
+        <Link href="/inventory" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <div className="card" style={{ height: '100%', cursor: 'pointer' }}>
+            <div className="card-header-flex">
+              <div>
+                <div className="card-value" style={{ color: '#a855f7' }}>
+                  {totalItemsCount}
+                </div>
+                <div className="card-title">Cataloged Products</div>
+              </div>
+              <div className="card-icon-wrapper" style={{ backgroundColor: 'rgba(168, 85, 247, 0.15)', color: '#a855f7' }}>
+                <Package size={24} />
+              </div>
             </div>
-            <div className="card-icon-wrapper primary">
-              <Users size={24} />
+            <div className="card-desc flex-between" style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
+              <span>Seeds & fertilizers</span>
+              <span style={{ color: '#a855f7', display: 'flex', alignItems: 'center', gap: '0.2rem', fontWeight: 600, fontSize: '0.75rem' }}>
+                Manage Items <ChevronRight size={14} />
+              </span>
             </div>
           </div>
-          <div className="card-desc">Farmers and buyers database</div>
-        </div>
+        </Link>
 
-        <div className="card">
-          <div className="card-header-flex">
-            <div>
-              <div className="card-value">{stockLogs.length}</div>
-              <div className="card-title">Stock Inflow Records</div>
+        <Link href="/sales" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <div className="card" style={{ height: '100%', cursor: 'pointer' }}>
+            <div className="card-header-flex">
+              <div>
+                <div className="card-value" style={{ color: '#f59e0b' }}>
+                  {totalInvoices}
+                </div>
+                <div className="card-title">Total Invoices</div>
+              </div>
+              <div className="card-icon-wrapper accent">
+                <Receipt size={24} />
+              </div>
             </div>
-            <div className="card-icon-wrapper accent">
-              <ArrowDownLeft size={24} />
+            <div className="card-desc flex-between" style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
+              <span>Completed orders</span>
+              <span style={{ color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '0.2rem', fontWeight: 600, fontSize: '0.75rem' }}>
+                Sales History <ChevronRight size={14} />
+              </span>
             </div>
           </div>
-          <div className="card-desc">Inventory shipments registered</div>
-        </div>
+        </Link>
       </div>
 
-      {/* Low Stock Alerts */}
-      {lowStockItems.length > 0 && (
-        <div className="card" style={{ borderLeft: '4px solid var(--danger)', marginBottom: '2rem', backgroundColor: 'rgba(239, 68, 68, 0.05)' }}>
-          <div className="flex-gap-3" style={{ marginBottom: '1rem', color: 'var(--danger)' }}>
-            <AlertTriangle size={24} />
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Low Stock Alert!</h3>
-          </div>
-          <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-            The following items are running low (less than 10 units) and need to be restocked:
-          </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
-            {lowStockItems.map(item => (
-              <span key={item._id} className="badge badge-danger" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
-                {item.name}: {item.stock} {item.unit} left
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Recent Logs Section */}
+      {/* Main Activity Grid */}
       <div className="grid-equal-panels">
-        {/* Recent Sales */}
+        {/* Revamped Recent Sales History */}
         <div className="card">
-          <div className="flex-between" style={{ marginBottom: '1rem' }}>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 600 }}>Recent Sales</h3>
-            <Link href="/sales" style={{ fontSize: '0.85rem', color: 'var(--primary)', textDecoration: 'none' }}>
-              View All Sales
+          <div className="flex-between" style={{ marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
+            <div>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Receipt size={20} style={{ color: 'var(--primary)' }} />
+                Recent Sales History
+              </h3>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                Latest billing transactions & purchased items
+              </p>
+            </div>
+            <Link href="/sales" className="btn btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
+              <span>View All</span>
+              <ChevronRight size={14} />
             </Link>
           </div>
+
           {recentSales.length === 0 ? (
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '2rem 0' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '2.5rem 0' }}>
               No sales transactions registered yet.
             </p>
           ) : (
-            <div className="table-container" style={{ margin: 0, border: 'none', backgroundColor: 'transparent' }}>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Invoice / Buyer</th>
-                    <th>Items</th>
-                    <th className="text-right">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentSales.map(sale => (
-                    <tr key={sale._id}>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                          <span style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--primary)', fontFamily: 'var(--font-mono)' }}>
-                            {sale.invoiceNumber || 'N/A'}
-                          </span>
-                          <span className="badge badge-secondary" style={{ textTransform: 'uppercase', fontSize: '0.65rem', fontWeight: 600, padding: '0.1rem 0.3rem' }} title="Cashier initials">
-                            {sale.invoiceNumber ? sale.invoiceNumber.replace(/[0-9]/g, '') : 'N/A'}
-                          </span>
-                        </div>
-                        <div style={{ fontWeight: 500, fontSize: '0.85rem', marginTop: '0.15rem' }}>{sale.customerId?.name || 'Walk-in Buyer'}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          {new Date(sale.date).toLocaleDateString()}
-                        </div>
-                      </td>
-                      <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                        {sale.items.map((it, idx) => (
-                          <div key={idx}>
-                            {it.itemId?.name || 'Unknown Item'} ({it.quantity} {it.itemId?.unit || 'kg'})
-                          </div>
-                        ))}
-                      </td>
-                      <td className="text-right" style={{ fontWeight: 600, color: 'var(--primary)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {recentSales.map(sale => (
+                <div key={sale._id} style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '1rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.6rem',
+                  transition: 'background-color 0.2s ease'
+                }}>
+                  <div className="flex-between">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{
+                        backgroundColor: 'var(--primary-glow)',
+                        color: 'var(--primary)',
+                        fontFamily: 'var(--font-mono)',
+                        fontWeight: 700,
+                        fontSize: '0.85rem',
+                        padding: '0.2rem 0.6rem',
+                        borderRadius: 'var(--radius-sm)'
+                      }}>
+                        {sale.invoiceNumber || 'INV-N/A'}
+                      </span>
+                      <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                        {sale.customerId?.name || 'Walk-in Buyer'}
+                      </span>
+                      {sale.customerId?.phone && (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          ({sale.customerId.phone})
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--primary)' }}>
                         ₹{sale.totalAmount.toLocaleString('en-IN')}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Items Purchased List */}
+                  <div style={{
+                    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                    padding: '0.5rem 0.75rem',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '0.825rem',
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '0.5rem 1rem'
+                  }}>
+                    {sale.items.map((it, idx) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>
+                          {it.itemId?.name || 'Item'}:
+                        </span>
+                        <span className="badge badge-success" style={{ fontSize: '0.75rem', padding: '0.15rem 0.45rem' }}>
+                          {formatDisplayQty(it.quantity, it.itemId?.unit)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex-between" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    <span>
+                      {new Date(sale.date).toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric'
+                      })}
+                    </span>
+                    <span className="badge badge-secondary" style={{ textTransform: 'uppercase', fontSize: '0.65rem' }}>
+                      {sale.paymentMode || 'Cash'}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
 
-        {/* Recent Stock Arrivals */}
+        {/* Recent Stock Inwards Panel */}
         <div className="card">
-          <div className="flex-between" style={{ marginBottom: '1rem' }}>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 600 }}>Recent Stock Inwards</h3>
-            <Link href="/stock" style={{ fontSize: '0.85rem', color: 'var(--primary)', textDecoration: 'none' }}>
-              View All Inwards
+          <div className="flex-between" style={{ marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
+            <div>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <ArrowDownLeft size={20} style={{ color: '#14b8a6' }} />
+                Recent Stock Inwards
+              </h3>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                Latest incoming inventory shipments
+              </p>
+            </div>
+            <Link href="/stock" className="btn btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
+              <span>View All</span>
+              <ChevronRight size={14} />
             </Link>
           </div>
+
           {recentStocks.length === 0 ? (
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '2rem 0' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '2.5rem 0' }}>
               No stock arrivals recorded yet.
             </p>
           ) : (
-            <div className="table-container" style={{ margin: 0, border: 'none', backgroundColor: 'transparent' }}>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Quantity</th>
-                    <th>Supplier</th>
-                    <th className="text-right">Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentStocks.map(log => (
-                    <tr key={log._id}>
-                      <td style={{ fontWeight: 500 }}>{log.itemId?.name || 'Deleted Item'}</td>
-                      <td>
-                        <span className="badge badge-success">
-                          +{log.quantity} {log.itemId?.unit || 'kg'}
-                        </span>
-                      </td>
-                      <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                        {log.supplier || 'N/A'}
-                      </td>
-                      <td className="text-right" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        {new Date(log.date).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {recentStocks.map(log => (
+                <div key={log._id} style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justify: 'space-between',
+                  gap: '1rem'
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                      {log.itemId?.name || 'Item Record'}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                      Supplier: <span style={{ color: 'var(--text-secondary)' }}>{log.supplier || 'N/A'}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem' }}>
+                    <span className="badge badge-success" style={{ fontSize: '0.8rem', padding: '0.25rem 0.6rem' }}>
+                      +{formatDisplayQty(log.quantity, log.itemId?.unit)}
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      {new Date(log.date).toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'short'
+                      })}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -348,3 +437,5 @@ export default function Dashboard() {
     </div>
   );
 }
+
+

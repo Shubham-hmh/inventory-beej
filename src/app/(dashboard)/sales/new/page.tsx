@@ -1321,36 +1321,64 @@ export default function NewSale() {
                 <X size={20} />
               </button>
             </div>
-            <div className="modal-body" id="printable-receipt" style={{ color: '#000000', backgroundColor: '#ffffff', borderRadius: 'var(--radius-md)', padding: '2rem', fontFamily: 'Courier, monospace' }}>
-              <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-                <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>KISAN BEEJ BHANDAR</h2>
-                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem' }}>Stock & Fertilizer Management System</p>
-                <p style={{ margin: 0, fontSize: '0.85rem' }}>Phone: {createdInvoice.customer?.phone || 'N/A'}</p>
-                <div style={{ borderBottom: '1px dashed #000000', margin: '1rem 0' }} />
+            <div className="modal-body" id="printable-receipt" style={{ color: '#0f172a', backgroundColor: '#ffffff', borderRadius: '12px', padding: '2rem', fontFamily: "'Segoe UI', Roboto, system-ui, -apple-system, sans-serif", border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.05)' }}>
+              {/* Invoice Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #0f172a', paddingBottom: '1.25rem', marginBottom: '1.25rem' }}>
+                <div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#166534', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span>🌾 KISAN BEEJ BHANDAR</span>
+                  </div>
+                  <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.85rem', color: '#475569', fontWeight: 500 }}>Seeds, Fertilizers & Agricultural Equipment</p>
+                  <p style={{ margin: '0.15rem 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>Store Contact: +91 {createdInvoice.customer?.phone || 'N/A'}</p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{ backgroundColor: '#0f172a', color: '#ffffff', padding: '0.35rem 0.75rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', display: 'inline-block' }}>
+                    TAX INVOICE
+                  </span>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', marginTop: '0.5rem' }}>
+                    #{createdInvoice.invoiceNumber || createdInvoice._id.substring(0, 8)}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.1rem' }}>
+                    Date: {new Date(createdInvoice.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </div>
+                </div>
               </div>
 
               {createdInvoice.isAppended && (
-                <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #86efac', padding: '0.5rem', borderRadius: '4px', marginBottom: '1rem', fontSize: '0.8rem', color: '#166534', textAlign: 'center' }}>
-                  ✓ Existing Customer: New items added to ledger invoice #{createdInvoice.invoiceNumber}
+                <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', padding: '0.6rem 0.8rem', borderRadius: '6px', marginBottom: '1.25rem', fontSize: '0.8rem', color: '#166534', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <span>✓</span>
+                  <span>Existing Customer: New items merged into ledger invoice #{createdInvoice.invoiceNumber}</span>
                 </div>
               )}
 
-              <div style={{ fontSize: '0.9rem', marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                <div><strong>Invoice No:</strong> {createdInvoice.invoiceNumber || createdInvoice._id}</div>
-                <div><strong>Date:</strong> {new Date(createdInvoice.date).toLocaleDateString()}</div>
-                <div><strong>Customer:</strong> {createdInvoice.customer?.name}</div>
-                {createdInvoice.customer?.address && <div><strong>Address:</strong> {createdInvoice.customer.address}</div>}
-                <div><strong>Payment:</strong> {createdInvoice.paymentMode === 'Credit' ? 'Credit / Udhaar' : createdInvoice.paymentMode}</div>
-                <div><strong>Cashier Initials:</strong> {createdInvoice.invoiceNumber ? createdInvoice.invoiceNumber.replace(/[0-9]/g, '') : 'N/A'}</div>
+              {/* Customer & Sale Metadata Card */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem', marginBottom: '1.25rem', fontSize: '0.85rem' }}>
+                <div>
+                  <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 700, color: '#64748b', marginBottom: '0.3rem', letterSpacing: '0.05em' }}>BILLED TO</div>
+                  <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.95rem' }}>{createdInvoice.customer?.name || 'Walk-in Customer'}</div>
+                  <div style={{ color: '#475569', marginTop: '0.15rem' }}>Phone: {createdInvoice.customer?.phone || 'N/A'}</div>
+                  {createdInvoice.customer?.address && <div style={{ color: '#475569', marginTop: '0.15rem' }}>Address: {createdInvoice.customer.address}</div>}
+                </div>
+                <div style={{ borderLeft: '1px solid #e2e8f0', paddingLeft: '1rem' }}>
+                  <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 700, color: '#64748b', marginBottom: '0.3rem', letterSpacing: '0.05em' }}>PAYMENT DETAILS</div>
+                  <div style={{ color: '#475569', marginBottom: '0.2rem' }}>
+                    Payment Mode: <strong style={{ color: createdInvoice.paymentMode === 'Credit' ? '#dc2626' : '#166534' }}>{createdInvoice.paymentMode === 'Credit' ? 'CREDIT / UDHAAR' : createdInvoice.paymentMode?.toUpperCase()}</strong>
+                  </div>
+                  <div style={{ color: '#475569' }}>
+                    Cashier Initials: <strong>{createdInvoice.invoiceNumber ? createdInvoice.invoiceNumber.replace(/[0-9]/g, '') : 'EMP'}</strong>
+                  </div>
+                </div>
               </div>
 
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
+              {/* Product Items Table */}
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px dashed #000000' }}>
-                    <th style={{ textAlign: 'left', padding: '0.5rem 0' }}>Item</th>
-                    <th style={{ textAlign: 'center', padding: '0.5rem 0' }}>Qty</th>
-                    <th style={{ textAlign: 'right', padding: '0.5rem 0' }}>Price</th>
-                    <th style={{ textAlign: 'right', padding: '0.5rem 0' }}>Total</th>
+                  <tr style={{ backgroundColor: '#0f172a', color: '#ffffff' }}>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontWeight: 600, borderTopLeftRadius: '6px', borderBottomLeftRadius: '6px' }}>#</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontWeight: 600 }}>Product Description</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'center', fontWeight: 600 }}>Qty</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 600 }}>Rate (₹)</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 600, borderTopRightRadius: '6px', borderBottomRightRadius: '6px' }}>Amount (₹)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1359,53 +1387,68 @@ export default function NewSale() {
                     const itemBrand = it.itemId?.brand || it.brand;
                     const itemVariety = it.itemId?.variety || it.variety;
                     const itemUnit = it.itemId?.unit || it.unit || 'kg';
+                    const isEven = index % 2 === 0;
 
                     return (
-                      <tr key={index}>
-                        <td style={{ padding: '0.5rem 0' }}>
-                          <div>{itemName}</div>
+                      <tr key={index} style={{ backgroundColor: isEven ? '#ffffff' : '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '0.65rem 0.75rem', color: '#64748b', fontWeight: 500 }}>{index + 1}</td>
+                        <td style={{ padding: '0.65rem 0.75rem' }}>
+                          <div style={{ fontWeight: 600, color: '#0f172a' }}>{itemName}</div>
                           {(itemBrand || itemVariety) && (
-                            <div style={{ fontSize: '0.75rem', color: '#666666' }}>
-                              ({itemBrand || 'No Brand'} - {itemVariety || 'No Variety'})
+                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.1rem' }}>
+                              Brand: {itemBrand || 'Standard'} | Variety: {itemVariety || 'Default'}
                             </div>
                           )}
                         </td>
-                        <td style={{ textAlign: 'center', padding: '0.5rem 0' }}>{formatDisplayQty(it.quantity, itemUnit)}</td>
-                        <td style={{ textAlign: 'right', padding: '0.5rem 0' }}>₹{it.price.toFixed(2)}</td>
-                        <td style={{ textAlign: 'right', padding: '0.5rem 0' }}>₹{(it.quantity * it.price).toFixed(2)}</td>
+                        <td style={{ padding: '0.65rem 0.75rem', textAlign: 'center', fontWeight: 600, color: '#334155' }}>
+                          {formatDisplayQty(it.quantity, itemUnit)}
+                        </td>
+                        <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', color: '#334155' }}>₹{it.price.toFixed(2)}</td>
+                        <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>₹{(it.quantity * it.price).toFixed(2)}</td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
 
-              <div style={{ borderTop: '1px dashed #000000', paddingTop: '0.5rem' }}>
-                {createdInvoice.discount && createdInvoice.discount > 0 ? (
-                  <div style={{ fontSize: '0.85rem', marginBottom: '0.35rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Subtotal:</span>
-                      <span>₹{(createdInvoice.totalAmount + createdInvoice.discount).toFixed(2)}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#166534', fontWeight: 600 }}>
-                      <span>Discount:</span>
-                      <span>-₹{createdInvoice.discount.toFixed(2)}</span>
-                    </div>
+              {/* Financial Totals Box */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.25rem' }}>
+                <div style={{ width: '270px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.9rem', fontSize: '0.85rem' }}>
+                  {createdInvoice.discount && createdInvoice.discount > 0 ? (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', color: '#475569' }}>
+                        <span>Subtotal:</span>
+                        <span>₹{(createdInvoice.totalAmount + createdInvoice.discount).toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', color: '#166534', fontWeight: 600 }}>
+                        <span>Discount:</span>
+                        <span>-₹{createdInvoice.discount.toFixed(2)}</span>
+                      </div>
+                      <div style={{ borderTop: '1px dashed #cbd5e1', marginBottom: '0.5rem' }}></div>
+                    </>
+                  ) : null}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0f172a' }}>GRAND TOTAL:</span>
+                    <span style={{ fontWeight: 900, fontSize: '1.3rem', color: '#166534' }}>₹{createdInvoice.totalAmount.toFixed(2)}</span>
                   </div>
-                ) : null}
-                <div style={{ textAlign: 'right', fontSize: '1.1rem', fontWeight: 'bold' }}>
-                  GRAND TOTAL: ₹{createdInvoice.totalAmount.toFixed(2)}
                 </div>
               </div>
 
               {createdInvoice.notes && (
-                <div style={{ marginTop: '1rem', fontSize: '0.8rem', fontStyle: 'italic' }}>
-                  Notes: {createdInvoice.notes}
+                <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '6px', padding: '0.6rem 0.8rem', marginBottom: '1.25rem', fontSize: '0.8rem', color: '#92400e' }}>
+                  <strong>Notes:</strong> {createdInvoice.notes}
                 </div>
               )}
 
-              <div style={{ borderTop: '1px dashed #000000', marginTop: '1.5rem', paddingTop: '1rem', textAlign: 'center', fontSize: '0.8rem' }}>
-                <p>Thank you for buying with us!</p>
-                <p>Kisan Bachao, Kisan Padhao.</p>
+              {/* Footer Terms & Signature */}
+              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', fontSize: '0.75rem', color: '#64748b' }}>
+                <div>
+                  <p style={{ margin: 0, fontWeight: 600, color: '#334155' }}>Thank you for buying with us!</p>
+                  <p style={{ margin: '0.2rem 0 0 0', color: '#166534', fontWeight: 500 }}>🌾 Kisan Ki Unnati, Desh Ka Vikas.</p>
+                </div>
+                <div style={{ textAlign: 'center', borderTop: '1px dashed #cbd5e1', paddingTop: '0.25rem', width: '140px' }}>
+                  <span style={{ fontWeight: 600, color: '#334155' }}>Authorised Signatory</span>
+                </div>
               </div>
             </div>
             <div className="modal-footer">
@@ -1417,17 +1460,32 @@ export default function NewSale() {
                   if (printContents) {
                     const printWindow = window.open('', '_blank');
                     if (printWindow) {
-                      printWindow.document.write('<html><head><title>Print Receipt</title></head><body style="padding:20px;">');
-                      printWindow.document.write(printContents);
-                      printWindow.document.write('</body></html>');
+                      printWindow.document.write(`
+                        <html>
+                          <head>
+                            <title>Tax Invoice - Kisan Beej Bhandar</title>
+                            <style>
+                              @page { size: auto; margin: 15mm; }
+                              body { font-family: 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif; color: #0f172a; margin: 0; padding: 10px; }
+                              @media print {
+                                body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                              }
+                            </style>
+                          </head>
+                          <body>${printContents}</body>
+                        </html>
+                      `);
                       printWindow.document.close();
-                      printWindow.print();
+                      printWindow.focus();
+                      setTimeout(() => {
+                        printWindow.print();
+                      }, 250);
                     }
                   }
                 }}
               >
                 <Printer size={16} />
-                <span>Print Receipt</span>
+                <span>Print Tax Invoice</span>
               </button>
               <button type="button" className="btn btn-primary" onClick={() => setShowReceipt(false)}>
                 Close

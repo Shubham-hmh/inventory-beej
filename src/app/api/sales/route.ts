@@ -99,7 +99,8 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { customer, items, paymentMode, date, notes, isNewCustomer = false } = body;
+    const { customer, items, paymentMode, date, notes, isNewCustomer = false, discount = 0 } = body;
+    const discountVal = Math.max(0, Number(discount) || 0);
 
     // Validate request
     if (!customer || !customer.name) {
@@ -240,11 +241,18 @@ export async function POST(request: Request) {
       if (existingSale) {
         // Append new items into the existing sale document
         existingSale.items.push(...saleItems);
-        existingSale.totalAmount = (existingSale.totalAmount || 0) + calculatedTotal;
-        if (notes) {
+        const incrementalTotal = Math.max(0, calculatedTotal - discountVal);
+        existingSale.totalAmount = (existingSale.totalAmount || 0) + incrementalTotal;
+        existingSale.discount = (existingSale.discount || 0) + discountVal;
+        
+        let appendNotes = notes || '';
+        if (discountVal > 0) {
+          appendNotes = appendNotes ? `${appendNotes} (Discount: ₹${discountVal})` : `Discount: ₹${discountVal}`;
+        }
+        if (appendNotes) {
           existingSale.notes = existingSale.notes
-            ? `${existingSale.notes} | ${notes}`
-            : notes;
+            ? `${existingSale.notes} | ${appendNotes}`
+            : appendNotes;
         }
         if (paymentMode) {
           existingSale.paymentMode = paymentMode;
@@ -294,10 +302,12 @@ export async function POST(request: Request) {
     const invoiceNumber = `${initials}${nextSequence}`;
 
     // 5. Create new sale transaction
+    const finalTotal = Math.max(0, calculatedTotal - discountVal);
     const newSale = await Sale.create({
       customerId: dbCustomer._id,
       items: saleItems,
-      totalAmount: calculatedTotal,
+      discount: discountVal,
+      totalAmount: finalTotal,
       paymentMode: paymentMode || 'Cash',
       date: date ? new Date(date) : new Date(),
       notes: notes || '',

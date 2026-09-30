@@ -34,11 +34,27 @@ interface Sale {
     price: number;
   }>;
   totalAmount: number;
+  discount?: number;
   paymentMode: 'Cash' | 'UPI' | 'Credit';
   date: string;
   notes?: string;
   invoiceSequence?: number;
   invoiceNumber?: string;
+}
+
+function cleanUnitName(rawUnit?: string): string {
+  if (!rawUnit) return '';
+  return rawUnit.replace(/^\d+(\.\d+)?\s*/, '').trim();
+}
+
+function formatDisplayQty(quantity: number | string, rawUnit?: string): string {
+  const qty = Number(quantity) || 0;
+  if (!rawUnit) return `${qty}`;
+  const unitName = cleanUnitName(rawUnit);
+  if (!unitName) {
+    return `${qty}`;
+  }
+  return `${qty} ${unitName}`;
 }
 
 export default function SalesHistory() {
@@ -511,7 +527,7 @@ export default function SalesHistory() {
                             </div>
                           )}
                         </td>
-                        <td style={{ textAlign: 'center', padding: '0.4rem 0' }}>{it.quantity} {it.itemId?.unit || 'kg'}</td>
+                        <td style={{ textAlign: 'center', padding: '0.4rem 0' }}>{formatDisplayQty(it.quantity, it.itemId?.unit)}</td>
                         <td style={{ textAlign: 'right', padding: '0.4rem 0' }}>₹{it.price.toFixed(2)}</td>
                         <td style={{ textAlign: 'right', padding: '0.4rem 0' }}>₹{(it.quantity * it.price).toFixed(2)}</td>
                       </tr>
@@ -519,8 +535,22 @@ export default function SalesHistory() {
                   </tbody>
                 </table>
 
-                <div style={{ borderTop: '1px dashed #000000', paddingTop: '0.5rem', textAlign: 'right', fontSize: '1rem', fontWeight: 'bold' }}>
-                  GRAND TOTAL: ₹{selectedSale.totalAmount.toFixed(2)}
+                <div style={{ borderTop: '1px dashed #000000', paddingTop: '0.5rem' }}>
+                  {selectedSale.discount && selectedSale.discount > 0 ? (
+                    <div style={{ fontSize: '0.85rem', marginBottom: '0.35rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Subtotal:</span>
+                        <span>₹{(selectedSale.totalAmount + selectedSale.discount).toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#166534', fontWeight: 600 }}>
+                        <span>Discount:</span>
+                        <span>-₹{selectedSale.discount.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  ) : null}
+                  <div style={{ textAlign: 'right', fontSize: '1rem', fontWeight: 'bold' }}>
+                    GRAND TOTAL: ₹{selectedSale.totalAmount.toFixed(2)}
+                  </div>
                 </div>
 
                 {selectedSale.notes && (

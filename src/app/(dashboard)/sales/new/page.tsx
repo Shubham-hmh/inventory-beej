@@ -53,6 +53,21 @@ interface CartItem {
   maxStock: number;
 }
 
+function cleanUnitName(rawUnit?: string): string {
+  if (!rawUnit) return '';
+  return rawUnit.replace(/^\d+(\.\d+)?\s*/, '').trim();
+}
+
+function formatDisplayQty(quantity: number | string, rawUnit?: string): string {
+  const qty = Number(quantity) || 0;
+  if (!rawUnit) return `${qty}`;
+  const unitName = cleanUnitName(rawUnit);
+  if (!unitName) {
+    return `${qty}`;
+  }
+  return `${qty} ${unitName}`;
+}
+
 export default function NewSale() {
   const router = useRouter();
   const [items, setItems] = useState<Item[]>([]);
@@ -81,6 +96,8 @@ export default function NewSale() {
   const [selectedVariety, setSelectedVariety] = useState('');
   const [salePrice, setSalePrice] = useState('');
   const [saleQty, setSaleQty] = useState('');
+  const [itemDiscount, setItemDiscount] = useState('');
+  const [billDiscount, setBillDiscount] = useState('');
 
   // Sale metadata
   const [paymentMode, setPaymentMode] = useState<'Cash' | 'UPI' | 'Credit'>('Cash');
@@ -286,7 +303,9 @@ export default function NewSale() {
     }
 
     const qty = Number(saleQty);
-    const price = Number(salePrice);
+    const rawPrice = Number(salePrice);
+    const disc = Math.max(0, Number(itemDiscount) || 0);
+    const finalPrice = Math.max(0, rawPrice - disc);
     const matchItem = items.find(it => it._id === selectedItemId);
 
     if (!matchItem) return;
@@ -296,11 +315,10 @@ export default function NewSale() {
     }
 
     // Check if already in cart
-    const existingIndex = cart.findIndex(c => c.itemId === selectedItemId);
+    const existingIndex = cart.findIndex(c => c.itemId === selectedItemId && c.price === finalPrice);
     if (existingIndex > -1) {
       const updatedCart = [...cart];
       updatedCart[existingIndex].quantity += qty;
-      updatedCart[existingIndex].price = price;
       setCart(updatedCart);
     } else {
       setCart([
@@ -311,7 +329,7 @@ export default function NewSale() {
           brand: matchItem.brand,
           variety: matchItem.variety,
           quantity: qty,
-          price,
+          price: finalPrice,
           unit: matchItem.unit,
           maxStock: matchItem.stock,
         },
@@ -325,6 +343,7 @@ export default function NewSale() {
     setSelectedItemId('');
     setSaleQty('');
     setSalePrice('');
+    setItemDiscount('');
     setError('');
   };
 
@@ -332,9 +351,11 @@ export default function NewSale() {
     setCart(cart.filter((_, idx) => idx !== index));
   };
 
-  const calculateTotal = () => {
-    return cart.reduce((acc, curr) => acc + curr.quantity * curr.price, 0);
-  };
+  const subtotalVal = cart.reduce((acc, curr) => acc + curr.quantity * curr.price, 0);
+  const discountVal = Math.max(0, Number(billDiscount) || 0);
+  const totalInvoiceVal = Math.max(0, subtotalVal - discountVal);
+
+  const calculateTotal = () => totalInvoiceVal;
 
   const handleSubmitInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -377,6 +398,7 @@ export default function NewSale() {
           address: customerAddress
         },
         isNewCustomer,
+        discount: discountVal,
         items: cart.map(c => ({
           itemId: c.itemId,
           quantity: c.quantity,
@@ -414,6 +436,8 @@ export default function NewSale() {
         setCustomerPhone('');
         setCustomerAddress('');
         setNotes('');
+        setBillDiscount('');
+        setItemDiscount('');
         setIsNewCustomer(false);
         setDetectedCustomer(null);
         setExistingInvoice(null);
@@ -460,7 +484,6 @@ export default function NewSale() {
     : [];
 
   const activeItem = items.find(it => it._id === selectedItemId);
-  const totalInvoiceVal = calculateTotal();
 
   return (
     <div>
@@ -782,15 +805,17 @@ export default function NewSale() {
             {activeItem && (
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', fontSize: '0.85rem' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Available Inventory:</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>Available Stock:</span>
                   <span className={`badge ${activeItem.stock > 10 ? 'badge-success' : 'badge-danger'}`}>
-                    {activeItem.stock} {activeItem.unit} in stock
+                    {activeItem.stock} {cleanUnitName(activeItem.unit) || 'units'} in stock
                   </span>
                 </div>
 
-                <div className="grid-2col">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
                   <div className="form-group">
-                    <label className="form-label">Quantity ({activeItem.unit}) *</label>
+                    <label className="form-label">
+                      Quantity {cleanUnitName(activeItem.unit) ? `(${cleanUnitName(activeItem.unit)})` : ''} *
+                    </label>
                     <input 
                       type="number" 
                       step="any"
@@ -802,7 +827,7 @@ export default function NewSale() {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">Unit Price (₹) *</label>
+                    <label className="form-label">Price / Unit (₹) *</label>
                     <input 
                       type="number" 
                       step="any"
@@ -812,7 +837,26 @@ export default function NewSale() {
                       onChange={(e) => setSalePrice(e.target.value)}
                     />
                   </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Item Discount (₹)</label>
+                    <input 
+                      type="number" 
+                      step="any"
+                      min="0"
+                      placeholder="0"
+                      className="form-control"
+                      value={itemDiscount}
+                      onChange={(e) => setItemDiscount(e.target.value)}
+                    />
+                  </div>
                 </div>
+
+                {itemDiscount && Number(itemDiscount) > 0 && (
+                  <div style={{ fontSize: '0.8rem', color: 'var(--success)', marginBottom: '0.5rem', fontWeight: 500 }}>
+                    ✓ Net Unit Price: ₹{Math.max(0, Number(salePrice || 0) - Number(itemDiscount))} / {cleanUnitName(activeItem.unit) || 'unit'} (₹{itemDiscount} off)
+                  </div>
+                )}
 
                 <button 
                   type="button" 
@@ -872,7 +916,7 @@ export default function NewSale() {
                             </div>
                           )}
                         </td>
-                        <td>{cItem.quantity} {cItem.unit}</td>
+                        <td>{formatDisplayQty(cItem.quantity, cItem.unit)}</td>
                         <td>₹{cItem.price}</td>
                         <td className="text-right" style={{ fontWeight: 600, color: 'var(--primary)' }}>
                           ₹{(cItem.quantity * cItem.price).toLocaleString('en-IN')}
@@ -930,11 +974,36 @@ export default function NewSale() {
               />
             </div>
 
+            {/* Bill-level Discount */}
+            <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+              <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Bill Discount (₹)</span>
+                {discountVal > 0 && (
+                  <span style={{ color: 'var(--success)', fontSize: '0.8rem', fontWeight: 600 }}>
+                    -₹{discountVal.toLocaleString('en-IN')} off total
+                  </span>
+                )}
+              </label>
+              <input 
+                type="number"
+                step="any"
+                min="0"
+                placeholder="Enter overall discount in ₹ (optional)"
+                className="form-control"
+                value={billDiscount}
+                onChange={(e) => setBillDiscount(e.target.value)}
+              />
+            </div>
+
             <div className="flex-between" style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
               <div>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  {existingInvoice && !isNewCustomer ? 'New Items Total' : 'Grand Total Amount'}
-                </span>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  {discountVal > 0 ? (
+                    <span>Subtotal: ₹{subtotalVal.toLocaleString('en-IN')} | Discount: -₹{discountVal.toLocaleString('en-IN')}</span>
+                  ) : (
+                    <span>{existingInvoice && !isNewCustomer ? 'New Items Total' : 'Grand Total Amount'}</span>
+                  )}
+                </div>
                 <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--primary)' }}>
                   ₹{totalInvoiceVal.toLocaleString('en-IN')}
                 </div>
@@ -1027,7 +1096,7 @@ export default function NewSale() {
                             </div>
                           )}
                         </td>
-                        <td style={{ textAlign: 'center', padding: '0.5rem 0' }}>{it.quantity} {itemUnit}</td>
+                        <td style={{ textAlign: 'center', padding: '0.5rem 0' }}>{formatDisplayQty(it.quantity, itemUnit)}</td>
                         <td style={{ textAlign: 'right', padding: '0.5rem 0' }}>₹{it.price.toFixed(2)}</td>
                         <td style={{ textAlign: 'right', padding: '0.5rem 0' }}>₹{(it.quantity * it.price).toFixed(2)}</td>
                       </tr>
@@ -1036,8 +1105,22 @@ export default function NewSale() {
                 </tbody>
               </table>
 
-              <div style={{ borderTop: '1px dashed #000000', paddingTop: '0.5rem', textAlign: 'right', fontSize: '1.1rem', fontWeight: 'bold' }}>
-                GRAND TOTAL: ₹{createdInvoice.totalAmount.toFixed(2)}
+              <div style={{ borderTop: '1px dashed #000000', paddingTop: '0.5rem' }}>
+                {createdInvoice.discount && createdInvoice.discount > 0 ? (
+                  <div style={{ fontSize: '0.85rem', marginBottom: '0.35rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Subtotal:</span>
+                      <span>₹{(createdInvoice.totalAmount + createdInvoice.discount).toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#166534', fontWeight: 600 }}>
+                      <span>Discount:</span>
+                      <span>-₹{createdInvoice.discount.toFixed(2)}</span>
+                    </div>
+                  </div>
+                ) : null}
+                <div style={{ textAlign: 'right', fontSize: '1.1rem', fontWeight: 'bold' }}>
+                  GRAND TOTAL: ₹{createdInvoice.totalAmount.toFixed(2)}
+                </div>
               </div>
 
               {createdInvoice.notes && (

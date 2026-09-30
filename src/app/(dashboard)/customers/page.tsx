@@ -50,6 +50,21 @@ interface DeleteTarget {
   totalSpent: number;
 }
 
+function cleanUnitName(rawUnit?: string): string {
+  if (!rawUnit) return '';
+  return rawUnit.replace(/^\d+(\.\d+)?\s*/, '').trim();
+}
+
+function formatDisplayQty(quantity: number | string, rawUnit?: string): string {
+  const qty = Number(quantity) || 0;
+  if (!rawUnit) return `${qty}`;
+  const unitName = cleanUnitName(rawUnit);
+  if (!unitName) {
+    return `${qty}`;
+  }
+  return `${qty} ${unitName}`;
+}
+
 export default function CustomersRegistry() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
@@ -367,7 +382,6 @@ export default function CustomersRegistry() {
                 <th>Customer Profile</th>
                 <th>Phone Number</th>
                 <th>Village / Address</th>
-                <th className="text-right">Total Visits</th>
                 <th className="text-right">Total Purchased</th>
                 <th className="text-right" style={{ minWidth: '110px' }}>Actions</th>
               </tr>
@@ -405,11 +419,6 @@ export default function CustomersRegistry() {
                         <MapPin size={14} style={{ color: 'var(--text-muted)' }} />
                         <span>{cust.address || 'N/A'}</span>
                       </div>
-                    </td>
-                    <td className="text-right">
-                      <span className="badge badge-info" style={{ fontWeight: 600 }}>
-                        {metrics.orderCount} orders
-                      </span>
                     </td>
                     <td className="text-right" style={{ fontWeight: 600, color: 'var(--primary)' }}>
                       ₹{metrics.totalSpent.toLocaleString('en-IN')}
@@ -500,7 +509,7 @@ export default function CustomersRegistry() {
                         {sale.items.map((item, idx) => (
                           <div key={idx} className="flex-between" style={{ fontSize: '0.85rem' }}>
                             <span style={{ color: 'var(--text-secondary)' }}>
-                              {item.itemId?.name || 'Deleted Product'} ({item.quantity} {item.itemId?.unit || 'kg'})
+                              {item.itemId?.name || 'Deleted Product'} ({formatDisplayQty(item.quantity, item.itemId?.unit)})
                             </span>
                             <span>₹{(item.quantity * item.price).toLocaleString('en-IN')}</span>
                           </div>

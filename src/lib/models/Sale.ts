@@ -12,6 +12,7 @@ export interface ISaleItem {
 export interface ISale extends Document {
   customerId: mongoose.Types.ObjectId;
   items: ISaleItem[];
+  discount?: number;
   totalAmount: number;
   paymentMode: 'Cash' | 'UPI' | 'Credit';
   date: Date;
@@ -33,6 +34,7 @@ const SaleSchema: Schema<ISale> = new Schema(
   {
     customerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
     items: [SaleItemSchema],
+    discount: { type: Number, default: 0, min: 0 },
     totalAmount: { type: Number, required: true, min: 0 },
     paymentMode: { type: String, enum: ['Cash', 'UPI', 'Credit'], default: 'Cash', required: true },
     date: { type: Date, required: true, default: Date.now },

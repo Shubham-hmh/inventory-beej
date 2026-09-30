@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Customer from '@/lib/models/Customer';
+import { getSessionUser } from '@/lib/auth';
 
 export async function GET() {
   try {
@@ -39,3 +40,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const session = await getSessionUser();
+
+    // Role Guard: Only admins can delete customers
+    if (!session) {
+      return NextResponse.json({ success: false, error: 'Unauthorized: Session missing' }, { status: 401 });
+    }
+    if (session.role !== 'admin') {
+      return NextResponse.json({ success: false, error: 'Forbidden: Admin access required to delete customers' }, { status: 403 });
+    }
+
+    await dbConnect();
+    const body = await request.json().catch(() => ({}));
+    const { ids } = body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json({ success: false, error: 'Please provide customer IDs array to delete' }, { status: 400 });
+    }
+
+    const result = await Customer.deleteMany({ _id: { $in: ids } });
+
+    return NextResponse.json({
+      success: true,
+      message: `Successfully deleted ${result.deletedCount} customer profile(s)`,
+      count: result.deletedCount,
+    });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+

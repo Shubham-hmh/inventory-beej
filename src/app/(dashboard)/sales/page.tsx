@@ -8,7 +8,10 @@ import {
   Printer, 
   X, 
   Calendar,
-  FileSpreadsheet
+  Trash2,
+  CheckCircle,
+  AlertTriangle,
+  RotateCcw
 } from 'lucide-react';
 
 interface Sale {
@@ -21,6 +24,7 @@ interface Sale {
   } | null;
   items: Array<{
     itemId: {
+      _id?: string;
       name: string;
       unit: string;
       brand?: string;
@@ -41,48 +45,140 @@ export default function SalesHistory() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   // Selected Sale for Detail Modal
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Multi-select for Batch Delete
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('All');
   const [dateFilter, setDateFilter] = useState('');
 
-  useEffect(() => {
-    async function fetchSales() {
-      try {
-        setLoading(true);
-        
-        // Role Guard Check: Employees cannot view sales history logs
-        const resMe = await fetch('/api/auth/me');
-        const dataMe = await resMe.json();
-        if (dataMe.success && dataMe.data.role === 'employee') {
-          window.location.href = '/sales/new';
-          return;
-        }
-
-        const res = await fetch('/api/sales');
-        const data = await res.json();
-        if (data.success) {
-          setSales(data.data || []);
-        } else {
-          setError(data.error || 'Failed to fetch sales history');
-        }
-      } catch (err) {
-        setError('Error connecting to backend API');
-      } finally {
-        setLoading(false);
+  const fetchSales = async () => {
+    try {
+      setLoading(true);
+      
+      // Role Guard Check: Employees cannot view sales history logs
+      const resMe = await fetch('/api/auth/me');
+      const dataMe = await resMe.json();
+      if (dataMe.success && dataMe.data.role === 'employee') {
+        window.location.href = '/sales/new';
+        return;
       }
+
+      const res = await fetch('/api/sales');
+      const data = await res.json();
+      if (data.success) {
+        setSales(data.data || []);
+      } else {
+        setError(data.error || 'Failed to fetch sales history');
+      }
+    } catch (err) {
+      setError('Error connecting to backend API');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
     fetchSales();
   }, []);
+
+  const showNotification = (msg: string, isError = false) => {
+    if (isError) {
+      setError(msg);
+      setTimeout(() => setError(''), 5000);
+    } else {
+      setSuccess(msg);
+      setTimeout(() => setSuccess(''), 5000);
+    }
+  };
 
   const handleViewSale = (sale: Sale) => {
     setSelectedSale(sale);
     setIsModalOpen(true);
+  };
+
+  const handleDeleteSale = async (sale: Sale) => {
+    const invName = sale.invoiceNumber || `#${sale._id.substring(sale._id.length - 6)}`;
+    const confirmMsg = `Are you sure you want to delete Invoice ${invName}?\n\n` +
+      `Total Amount: ₹${sale.totalAmount.toLocaleString('en-IN')}\n` +
+      `Items: ${sale.items.length} product(s)\n\n` +
+      `• The items in this sale will be automatically restored back to inventory stock.`;
+
+    if (!window.confirm(confirmMsg)) {
+      return;
+    }
+
+    try {
+      setDeletingId(sale._id);
+      const res = await fetch(`/api/sales/${sale._id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        showNotification(`Invoice ${invName} deleted successfully. Stock has been restored.`);
+        setSales(prev => prev.filter(s => s._id !== sale._id));
+        setSelectedIds(prev => prev.filter(id => id !== sale._id));
+        if (selectedSale?._id === sale._id) {
+          setIsModalOpen(false);
+          setSelectedSale(null);
+        }
+      } else {
+        showNotification(data.error || 'Failed to delete sale record.', true);
+      }
+    } catch (err: any) {
+      showNotification('Network error occurred while deleting sale record.', true);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+
+    const count = selectedIds.length;
+    const confirmMsg = `Are you sure you want to delete ${count} selected sale records?\n\n` +
+      `• All items sold in these ${count} sales will be restored back into inventory stock.\n` +
+      `• This action cannot be undone.`;
+
+    if (!window.confirm(confirmMsg)) {
+      return;
+    }
+
+    try {
+      setIsBulkDeleting(true);
+      const res = await fetch('/api/sales', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedIds, restoreStock: true }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        showNotification(`Successfully deleted ${count} sale records and restored stock.`);
+        setSales(prev => prev.filter(s => !selectedIds.includes(s._id)));
+        setSelectedIds([]);
+        if (selectedSale && selectedIds.includes(selectedSale._id)) {
+          setIsModalOpen(false);
+          setSelectedSale(null);
+        }
+      } else {
+        showNotification(data.error || 'Failed to delete selected sales.', true);
+      }
+    } catch (err: any) {
+      showNotification('Network error deleting selected sales.', true);
+    } finally {
+      setIsBulkDeleting(false);
+    }
   };
 
   const handlePrint = () => {
@@ -117,19 +213,45 @@ export default function SalesHistory() {
     return matchesSearch && matchesPayment && matchesDate;
   });
 
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filteredSales.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredSales.map(s => s._id));
+    }
+  };
+
+  const toggleSelectSale = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
   return (
     <div>
-      <div className="page-header">
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div className="page-title-group">
           <h1>Sales Transaction Ledger</h1>
-          <p>View, query, and print historical customer sales invoices and payment logs</p>
+          <p>View, query, delete, and print customer sales invoices and payment logs</p>
         </div>
       </div>
 
-      {error && <div className="alert alert-danger">{error}</div>}
+      {error && (
+        <div className="alert alert-danger" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
+          <AlertTriangle size={18} />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {success && (
+        <div className="alert alert-success" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
+          <CheckCircle size={18} />
+          <span>{success}</span>
+        </div>
+      )}
 
       {/* Filter Options */}
-      <div className="card" style={{ marginBottom: '2rem' }}>
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', alignItems: 'end' }}>
           <div className="form-group" style={{ margin: 0 }}>
             <label className="form-label">Search Buyer Name / Phone</label>
@@ -188,6 +310,53 @@ export default function SalesHistory() {
         </div>
       </div>
 
+      {/* Batch Action Toolbar */}
+      {selectedIds.length > 0 && (
+        <div 
+          className="card" 
+          style={{ 
+            marginBottom: '1.5rem', 
+            padding: '0.85rem 1.25rem', 
+            backgroundColor: 'rgba(239, 68, 68, 0.08)', 
+            borderColor: 'rgba(239, 68, 68, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span className="badge badge-danger" style={{ fontSize: '0.8rem', padding: '0.25rem 0.6rem' }}>
+              {selectedIds.length} Selected
+            </span>
+            <span style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+              Choose action for selected sale records:
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <button
+              className="btn btn-secondary"
+              style={{ fontSize: '0.85rem', padding: '0.45rem 0.9rem' }}
+              onClick={() => setSelectedIds([])}
+              disabled={isBulkDeleting}
+            >
+              Deselect All
+            </button>
+            <button
+              className="btn btn-danger"
+              style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}
+              onClick={handleBulkDelete}
+              disabled={isBulkDeleting}
+            >
+              <Trash2 size={15} />
+              <span>{isBulkDeleting ? 'Deleting...' : `Delete Selected (${selectedIds.length})`}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Sales Table */}
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}>
@@ -206,55 +375,87 @@ export default function SalesHistory() {
           <table className="table">
             <thead>
               <tr>
+                <th style={{ width: '40px', textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={filteredSales.length > 0 && selectedIds.length === filteredSales.length}
+                    onChange={toggleSelectAll}
+                    title="Select all sales"
+                    style={{ cursor: 'pointer' }}
+                  />
+                </th>
                 <th>Invoice Date</th>
                 <th>Invoice No.</th>
                 <th>Buyer Information</th>
                 <th>Cashier</th>
                 <th>Payment Mode</th>
                 <th className="text-right">Total Amount</th>
-                <th className="text-right">Action</th>
+                <th className="text-right" style={{ minWidth: '110px' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredSales.map(sale => (
-                <tr key={sale._id}>
-                  <td>{new Date(sale.date).toLocaleDateString()}</td>
-                  <td style={{ fontSize: '0.85rem', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
-                    {sale.invoiceNumber || 'N/A'}
-                  </td>
-                  <td>
-                    <div style={{ fontWeight: 600 }}>{sale.customerId?.name || 'Walk-in Buyer'}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                      {sale.customerId?.phone}
-                    </div>
-                  </td>
-                  <td>
-                    <span className="badge badge-secondary" style={{ textTransform: 'uppercase', fontWeight: 600, fontSize: '0.75rem' }}>
-                      {sale.invoiceNumber ? sale.invoiceNumber.replace(/[0-9]/g, '') : 'N/A'}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`badge ${
-                      sale.paymentMode === 'Cash' ? 'badge-success' : 
-                      sale.paymentMode === 'UPI' ? 'badge-info' : 'badge-warning'
-                    }`}>
-                      {sale.paymentMode}
-                    </span>
-                  </td>
-                  <td className="text-right" style={{ fontWeight: 600, color: 'var(--primary)' }}>
-                    ₹{sale.totalAmount.toLocaleString('en-IN')}
-                  </td>
-                  <td className="text-right">
-                    <button 
-                      className="btn btn-secondary btn-icon" 
-                      onClick={() => handleViewSale(sale)}
-                      title="View Invoice details"
-                    >
-                      <Eye size={16} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {filteredSales.map(sale => {
+                const isSelected = selectedIds.includes(sale._id);
+                const isThisDeleting = deletingId === sale._id;
+
+                return (
+                  <tr key={sale._id} style={{ backgroundColor: isSelected ? 'rgba(99, 102, 241, 0.05)' : undefined }}>
+                    <td style={{ textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelectSale(sale._id)}
+                        style={{ cursor: 'pointer' }}
+                      />
+                    </td>
+                    <td>{new Date(sale.date).toLocaleDateString()}</td>
+                    <td style={{ fontSize: '0.85rem', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
+                      {sale.invoiceNumber || 'N/A'}
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{sale.customerId?.name || 'Walk-in Buyer'}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        {sale.customerId?.phone || 'No phone'}
+                      </div>
+                    </td>
+                    <td>
+                      <span className="badge badge-secondary" style={{ textTransform: 'uppercase', fontWeight: 600, fontSize: '0.75rem' }}>
+                        {sale.invoiceNumber ? sale.invoiceNumber.replace(/[0-9]/g, '') : 'N/A'}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`badge ${
+                        sale.paymentMode === 'Cash' ? 'badge-success' : 
+                        sale.paymentMode === 'UPI' ? 'badge-info' : 'badge-warning'
+                      }`}>
+                        {sale.paymentMode}
+                      </span>
+                    </td>
+                    <td className="text-right" style={{ fontWeight: 600, color: 'var(--primary)' }}>
+                      ₹{sale.totalAmount.toLocaleString('en-IN')}
+                    </td>
+                    <td className="text-right">
+                      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                        <button 
+                          className="btn btn-secondary btn-icon" 
+                          onClick={() => handleViewSale(sale)}
+                          title="View Invoice details"
+                        >
+                          <Eye size={16} />
+                        </button>
+                        <button 
+                          className="btn btn-danger btn-icon" 
+                          onClick={() => handleDeleteSale(sale)}
+                          disabled={isThisDeleting || isBulkDeleting}
+                          title="Delete sale and restore stock (Admin)"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -323,26 +524,38 @@ export default function SalesHistory() {
                 </div>
 
                 {selectedSale.notes && (
-                  <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', fontStyle: 'italic' }}>
+                  <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', fontStyle: 'italic', wordBreak: 'break-word' }}>
                     Notes: {selectedSale.notes}
                   </div>
                 )}
               </div>
 
             </div>
-            <div className="modal-footer">
-              <button type="button" className="btn btn-secondary" onClick={handlePrint}>
-                <Printer size={16} />
-                <span>Print Receipt</span>
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <button 
+                type="button" 
+                className="btn btn-danger" 
+                onClick={() => handleDeleteSale(selectedSale)}
+                disabled={deletingId === selectedSale._id}
+              >
+                <Trash2 size={16} />
+                <span>Delete Sale</span>
               </button>
-              <button type="button" className="btn btn-primary" onClick={() => { setIsModalOpen(false); setSelectedSale(null); }}>
-                Close
-              </button>
+
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button type="button" className="btn btn-secondary" onClick={handlePrint}>
+                  <Printer size={16} />
+                  <span>Print Receipt</span>
+                </button>
+                <button type="button" className="btn btn-primary" onClick={() => { setIsModalOpen(false); setSelectedSale(null); }}>
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
-      
+
       <style jsx global>{`
         @keyframes spin {
           0% { transform: rotate(0deg); }
